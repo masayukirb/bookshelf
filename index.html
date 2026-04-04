@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>BookShelf</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.1/lib/msal-browser.min.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;600;800&family=DM+Mono:wght@300;400;500&display=swap');
 
@@ -721,6 +721,7 @@
 </div>
 
 <script>
+(async () => {
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
   // --- MSAL / OneDrive 設定 ---
@@ -728,12 +729,13 @@
     auth: {
       clientId: '92400200-6d34-4190-9868-da5cdbb57d17',
       authority: 'https://login.microsoftonline.com/consumers',
-      redirectUri: window.location.href.split('?')[0],
+      redirectUri: window.location.href.split('?')[0].split('#')[0],
     },
     cache: { cacheLocation: 'localStorage' }
   };
   const SCOPES = ['Files.Read'];
   const msalInstance = new msal.PublicClientApplication(MSAL_CONFIG);
+  await msalInstance.initialize();
 
   let msalAccount = null;
   let accessToken = null;
@@ -1424,6 +1426,7 @@
   }
 
   init();
+})();
 </script>
 </body>
 </html>
