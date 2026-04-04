@@ -215,6 +215,27 @@
     box-shadow: 4px 4px 0 #054b05;
   }
 
+  .logout-btn {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    background: none;
+    color: var(--muted);
+    font-family: 'Shippori Mincho', serif;
+    font-size: 13px;
+    border: 1px solid var(--rule);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .logout-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .logout-btn.visible { display: flex; }
+
   /* OneDriveステータスバー */
   .onedrive-status {
     font-family: 'DM Mono', monospace;
@@ -677,6 +698,7 @@
     <div class="book-count"><strong id="countNum">0</strong> 冊の蔵書</div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;">
       <button class="onedrive-btn" id="onedriveBtn">☁ OneDriveと連携</button>
+      <button class="logout-btn" id="logoutBtn">⏏ ログアウト</button>
       <button class="add-btn" id="addBtn">＋ PDFを追加</button>
     </div>
     <input type="file" id="fileInput" accept="application/pdf" multiple>
@@ -760,6 +782,7 @@
   const searchHint = document.getElementById('searchHint');
   const onedriveBtn = document.getElementById('onedriveBtn');
   const onedriveStatus = document.getElementById('onedriveStatus');
+  const logoutBtn = document.getElementById('logoutBtn');
 
   // --- IndexedDB 初期化 ---
   function openDB() {
@@ -850,7 +873,42 @@
     return result.accessToken;
   }
 
-  function setOnedriveStatus(msg, isError = false, showReset = false) {
+  function setLoggedIn(account) {
+    msalAccount = account;
+    onedriveBtn.textContent = '✓ OneDrive連携中';
+    onedriveBtn.classList.add('connected');
+    logoutBtn.classList.add('visible');
+  }
+
+  function setLoggedOut() {
+    msalAccount = null;
+    accessToken = null;
+    onedriveBtn.textContent = '☁ OneDriveと連携';
+    onedriveBtn.classList.remove('connected');
+    logoutBtn.classList.remove('visible');
+  }
+
+  async function logout() {
+    try {
+      // MSALのキャッシュをクリア
+      const accounts = msalInstance.getAllAccounts();
+      for (const account of accounts) {
+        await msalInstance.logoutPopup({ account, mainWindowRedirectUri: window.location.href });
+      }
+    } catch(e) {
+      // ポップアップを閉じた場合などはキャッシュだけクリア
+      localStorage.removeItem(STORAGE_KEY_FOLDER);
+      msalInstance.getAllAccounts().forEach(a => msalInstance.getTokenCache().removeAccount(a));
+    }
+    setLoggedOut();
+    setOnedriveStatus('ログアウトしました');
+  }
+
+  logoutBtn.addEventListener('click', async () => {
+    if (confirm('OneDriveの連携を解除しますか？\n（蔵書データはそのまま残ります）')) {
+      await logout();
+    }
+  });
     onedriveStatus.innerHTML = escHtml(msg)
       + (showReset ? ' <span id="resetFolderLink" style="cursor:pointer;text-decoration:underline;color:var(--accent);margin-left:8px;">フォルダを変更</span>' : '');
     onedriveStatus.classList.add('visible');
@@ -1047,8 +1105,7 @@
         return !books.find(b => b.name === name);
       });
 
-      onedriveBtn.textContent = '✓ OneDrive連携中';
-      onedriveBtn.classList.add('connected');
+      setLoggedIn(msalAccount);
       onedriveBtn.disabled = false;
 
       if (newItems.length === 0) {
@@ -1391,12 +1448,10 @@
     // ログイン済みなら連携ボタンを「接続中」表示に
     const accounts = msalInstance.getAllAccounts();
     if (accounts.length > 0) {
-      msalAccount = accounts[0];
-      onedriveBtn.textContent = '✓ OneDrive連携中';
-      onedriveBtn.classList.add('connected');
+      setLoggedIn(accounts[0]);
       const saved = getSavedFolder();
       const folderLabel = saved ? `フォルダ：${saved.path || saved.name}` : 'フォルダ未設定';
-      setOnedriveStatus(`接続済み：${msalAccount.username} · ${folderLabel} — ボタンを押すと再同期します`);
+      setOnedriveStatus(`接続済み：${accounts[0].username} · ${folderLabel} — ボタンを押すと再同期します`);
     }
 
     db = await openDB();
