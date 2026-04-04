@@ -586,6 +586,89 @@ color: var(–rule);
 margin-bottom: 4px;
 }
 
+/* NDCバッジ */
+.ndc-row {
+display: flex;
+align-items: center;
+gap: 6px;
+margin-bottom: 4px;
+flex-wrap: wrap;
+}
+
+.ndc-badge {
+display: inline-flex;
+align-items: center;
+gap: 4px;
+padding: 2px 8px;
+background: var(–ink);
+color: var(–paper);
+font-family: ‘DM Mono’, monospace;
+font-size: 10px;
+letter-spacing: 0.05em;
+}
+
+.ndc-badge.pending {
+background: var(–rule);
+}
+
+.ndc-edit-btn {
+background: none;
+border: none;
+cursor: pointer;
+font-size: 11px;
+color: var(–muted);
+font-family: ‘DM Mono’, monospace;
+padding: 0;
+text-decoration: underline;
+text-underline-offset: 2px;
+}
+
+.ndc-edit-btn:hover { color: var(–accent); }
+
+/* NDC編集インライン */
+.ndc-edit-row {
+display: none;
+align-items: center;
+gap: 6px;
+margin-bottom: 4px;
+flex-wrap: wrap;
+}
+
+.ndc-edit-row.visible { display: flex; }
+
+.ndc-input {
+width: 52px;
+padding: 3px 6px;
+font-family: ‘DM Mono’, monospace;
+font-size: 12px;
+border: 1px solid var(–rule);
+background: white;
+color: var(–ink);
+outline: none;
+}
+
+.ndc-input:focus { border-color: var(–accent); }
+
+.ndc-save-btn {
+padding: 3px 10px;
+background: var(–ink);
+color: var(–paper);
+border: none;
+font-family: ‘Shippori Mincho’, serif;
+font-size: 11px;
+cursor: pointer;
+}
+
+.ndc-cancel-btn {
+padding: 3px 8px;
+background: none;
+color: var(–muted);
+border: 1px solid var(–rule);
+font-family: ‘Shippori Mincho’, serif;
+font-size: 11px;
+cursor: pointer;
+}
+
 .book-title {
 font-size: 18px;
 font-weight: 600;
@@ -1374,8 +1457,15 @@ to { opacity: 1; transform: translateY(0); }
           authors: bookInfo?.authors || null,
           publisher: bookInfo?.publisher || null,
           coverUrl: bookInfo?.coverUrl || null,
+          ndc: null,
           addedAt: new Date().toISOString()
         };
+
+        // NDC自動判定
+        progressLabel.textContent = `NDC分類中：${name}`;
+        const ndcCode = await classifyNDC(book);
+        book.ndc = ndcCode;
+
         await dbPut(book);
         books.push(book);
       } catch (e) {
@@ -1394,6 +1484,58 @@ to { opacity: 1; transform: translateY(0); }
   }
 
   // saveBooks は不要になったため削除（dbPut で都度保存）
+
+  // --- NDC分類 ---
+  const NDC = {
+    '000':'総記','001':'知識・学問・情報','002':'知識・学問','007':'情報科学',
+    '010':'図書館','020':'図書','030':'百科事典','040':'一般論文集','050':'逐次刊行物','060':'団体','070':'ジャーナリズム','080':'叢書','090':'郷土資料',
+    '100':'哲学','110':'哲学各論','120':'東洋思想','130':'西洋哲学','140':'心理学','150':'倫理学','160':'宗教','170':'神道','180':'仏教','190':'キリスト教',
+    '200':'歴史','210':'日本史','220':'アジア史','230':'ヨーロッパ史','240':'アフリカ史','250':'北アメリカ史','260':'南アメリカ史','270':'オセアニア史','280':'伝記','290':'地理',
+    '300':'社会科学','310':'政治','320':'法律','330':'経済','340':'財政','350':'統計','360':'社会','370':'教育','380':'風俗習慣','390':'国防・軍事',
+    '400':'自然科学','410':'数学','420':'物理学','430':'化学','440':'天文学','450':'地球科学','460':'生物科学','470':'植物学','480':'動物学','490':'医学',
+    '500':'技術・工学','510':'土木工学','520':'建築','530':'機械工学','540':'電気工学','550':'海洋工学','560':'金属工学','570':'化学工業','580':'製造工業','590':'家政学',
+    '600':'産業','610':'農業','620':'園芸','630':'蚕糸業','640':'畜産業','650':'林業','660':'水産業','670':'商業','680':'交通・観光','690':'通信',
+    '700':'芸術・美術','710':'彫刻','720':'絵画','730':'版画','740':'写真','750':'工芸','760':'音楽','770':'演劇','780':'スポーツ','790':'諸芸・娯楽',
+    '800':'言語','810':'日本語','820':'中国語','830':'英語','840':'ドイツ語','850':'フランス語','860':'スペイン語','870':'イタリア語','880':'ロシア語','890':'その他言語',
+    '900':'文学','910':'日本文学','911':'日本詩歌','912':'日本戯曲','913':'日本小説','914':'日本評論・随筆','915':'日本日記・書簡','916':'日本記録・手記','917':'日本書簡','918':'日本作品集','919':'漢詩文','920':'中国文学','930':'英米文学','940':'ドイツ文学','950':'フランス文学','960':'スペイン文学','970':'イタリア文学','980':'ロシア文学','990':'その他文学'
+  };
+
+  function getNdcLabel(code) {
+    if (!code) return null;
+    const c = String(code).padStart(3, '0');
+    return NDC[c] ? `${c} ${NDC[c]}` : c;
+  }
+
+  async function classifyNDC(book) {
+    try {
+      const prompt = `以下の書籍をNDC（日本十進分類法）の3桁コードで分類してください。
+書名：${book.name}
+著者：${book.authors || '不明'}
+出版社：${book.publisher || '不明'}
+
+NDCの3桁コード（数字3桁のみ）を返してください。例：913
+コードと簡単な理由を次のJSON形式で返してください（他のテキストは不要）：
+{"code":"913","reason":"日本語の小説のため"}`;
+
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 100,
+          messages: [{ role: 'user', content: prompt }]
+        })
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      const text = data.content?.map(c => c.text || '').join('') || '';
+      const clean = text.replace(/```json|```/g, '').trim();
+      const parsed = JSON.parse(clean);
+      return parsed.code ? String(parsed.code).padStart(3, '0') : null;
+    } catch(e) {
+      return null;
+    }
+  }
 
   // --- 検索 ---
   function search(query) {
@@ -1489,6 +1631,21 @@ to { opacity: 1; transform: translateY(0); }
       const publisherHTML = book.publisher
         ? `<div class="book-publisher">${escHtml(book.publisher)}</div>` : '';
 
+      // NDCバッジ＋手動修正UI
+      const ndcLabel = getNdcLabel(book.ndc);
+      const ndcHTML = `
+        <div class="ndc-row" id="ndc-row-${book.id}">
+          ${ndcLabel
+            ? `<span class="ndc-badge">📚 ${escHtml(ndcLabel)}</span>`
+            : `<span class="ndc-badge pending">NDC分類中…</span>`}
+          <button class="ndc-edit-btn" data-id="${book.id}">修正</button>
+        </div>
+        <div class="ndc-edit-row" id="ndc-edit-${book.id}">
+          <input class="ndc-input" type="text" maxlength="3" placeholder="913" value="${book.ndc || ''}" id="ndc-input-${book.id}">
+          <button class="ndc-save-btn" data-id="${book.id}">保存</button>
+          <button class="ndc-cancel-btn" data-id="${book.id}">キャンセル</button>
+        </div>`;
+
       card.innerHTML = `
         <div class="book-number">${String(idx + 1).padStart(2, '0')}</div>
         ${coverHTML}
@@ -1496,10 +1653,31 @@ to { opacity: 1; transform: translateY(0); }
           <div class="book-title">${escHtml(book.name)}${matchBadge}</div>
           ${authorHTML}
           ${publisherHTML}
+          ${ndcHTML}
           <div class="book-meta">${book.numPages}ページ · 登録日 ${formatDate(book.addedAt)} ${queryBadge}</div>
           ${hitsHTML}
         </div>
         <button class="delete-btn" data-id="${book.id}" title="削除">✕</button>`;
+
+      // NDC編集イベント
+      card.querySelector('.ndc-edit-btn').addEventListener('click', () => {
+        document.getElementById(`ndc-row-${book.id}`).style.display = 'none';
+        document.getElementById(`ndc-edit-${book.id}`).classList.add('visible');
+        document.getElementById(`ndc-input-${book.id}`).focus();
+      });
+
+      card.querySelector('.ndc-cancel-btn').addEventListener('click', () => {
+        document.getElementById(`ndc-row-${book.id}`).style.display = '';
+        document.getElementById(`ndc-edit-${book.id}`).classList.remove('visible');
+      });
+
+      card.querySelector('.ndc-save-btn').addEventListener('click', async () => {
+        const input = document.getElementById(`ndc-input-${book.id}`);
+        const code = input.value.trim().padStart(3, '0');
+        book.ndc = code || null;
+        await dbPut(book);
+        renderBooks(searchInput.value.trim());
+      });
 
       bookList.appendChild(card);
     });
@@ -1615,15 +1793,26 @@ to { opacity: 1; transform: translateY(0); }
           book.authors = info.authors;
           book.publisher = info.publisher;
           book.coverUrl = info.coverUrl;
-          await dbPut(book);
         } else {
           book.authors = null;
           book.publisher = null;
           book.coverUrl = null;
-          await dbPut(book);
         }
+        // NDCも未取得なら判定
+        if (!book.ndc) {
+          book.ndc = await classifyNDC(book);
+        }
+        await dbPut(book);
         renderBooks(searchInput.value.trim());
       }
+    }
+
+    // NDCが未設定の既存書籍にバックグラウンドで付与
+    const needsNDC = books.filter(b => b.ndc === undefined || b.ndc === null && b.authors !== undefined);
+    for (const book of needsNDC) {
+      book.ndc = await classifyNDC(book);
+      await dbPut(book);
+      renderBooks(searchInput.value.trim());
     }
   }
 
