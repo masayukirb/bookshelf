@@ -1727,25 +1727,25 @@
 
       // ISBN修正UI
       const isbnHTML = `
-        <div class="isbn-edit-row" id="isbn-edit-${book.id}">
-          <input class="isbn-input" type="text" placeholder="ISBN（ハイフン不要）" id="isbn-input-${book.id}" maxlength="17">
-          <button class="isbn-fetch-btn" id="isbn-fetch-${book.id}">取得</button>
-          <button class="isbn-cancel-btn" id="isbn-cancel-${book.id}">キャンセル</button>
+        <div class="isbn-edit-row">
+          <input class="isbn-input" type="text" placeholder="ISBN（ハイフン不要）" maxlength="17">
+          <button class="isbn-fetch-btn">取得</button>
+          <button class="isbn-cancel-btn">キャンセル</button>
         </div>`;
 
       // NDCバッジ＋手動修正UI
       const ndcLabel = getNdcLabel(book.ndc);
       const ndcHTML = `
-        <div class="ndc-row" id="ndc-row-${book.id}">
+        <div class="ndc-row">
           ${ndcLabel
             ? `<span class="ndc-badge">📚 ${escHtml(ndcLabel)}</span>`
-            : `<span class="ndc-badge pending">NDC分類中…</span>`}
-          <button class="ndc-edit-btn" data-id="${book.id}">修正</button>
+            : `<span class="ndc-badge pending">NDC未分類</span>`}
+          <button class="ndc-edit-btn">修正</button>
         </div>
-        <div class="ndc-edit-row" id="ndc-edit-${book.id}">
-          <input class="ndc-input" type="text" maxlength="3" placeholder="913" value="${book.ndc || ''}" id="ndc-input-${book.id}">
-          <button class="ndc-save-btn" data-id="${book.id}">保存</button>
-          <button class="ndc-cancel-btn" data-id="${book.id}">キャンセル</button>
+        <div class="ndc-edit-row">
+          <input class="ndc-input" type="text" maxlength="3" placeholder="例：324" value="${book.ndc || ''}">
+          <button class="ndc-save-btn">保存</button>
+          <button class="ndc-cancel-btn">キャンセル</button>
         </div>`;
 
       card.innerHTML = `
@@ -1764,19 +1764,18 @@
 
       // NDC編集イベント
       card.querySelector('.ndc-edit-btn').addEventListener('click', () => {
-        document.getElementById(`ndc-row-${book.id}`).style.display = 'none';
-        document.getElementById(`ndc-edit-${book.id}`).classList.add('visible');
-        document.getElementById(`ndc-input-${book.id}`).focus();
+        card.querySelector('.ndc-row').style.display = 'none';
+        card.querySelector('.ndc-edit-row').classList.add('visible');
+        card.querySelector('.ndc-input').focus();
       });
 
       card.querySelector('.ndc-cancel-btn').addEventListener('click', () => {
-        document.getElementById(`ndc-row-${book.id}`).style.display = '';
-        document.getElementById(`ndc-edit-${book.id}`).classList.remove('visible');
+        card.querySelector('.ndc-row').style.display = '';
+        card.querySelector('.ndc-edit-row').classList.remove('visible');
       });
 
       card.querySelector('.ndc-save-btn').addEventListener('click', async () => {
-        const input = document.getElementById(`ndc-input-${book.id}`);
-        const code = input.value.trim().padStart(3, '0');
+        const code = card.querySelector('.ndc-input').value.trim().padStart(3, '0');
         book.ndc = code || null;
         await dbPut(book);
         renderBooks(searchInput.value.trim());
@@ -1784,18 +1783,17 @@
 
       // ISBN修正イベント
       card.querySelector('.isbn-edit-btn').addEventListener('click', () => {
-        const row = document.getElementById(`isbn-edit-${book.id}`);
-        row.classList.add('visible');
-        document.getElementById(`isbn-input-${book.id}`).focus();
+        card.querySelector('.isbn-edit-row').classList.add('visible');
+        card.querySelector('.isbn-input').focus();
       });
 
-      document.getElementById(`isbn-cancel-${book.id}`)?.addEventListener('click', () => {
-        document.getElementById(`isbn-edit-${book.id}`).classList.remove('visible');
+      card.querySelector('.isbn-cancel-btn').addEventListener('click', () => {
+        card.querySelector('.isbn-edit-row').classList.remove('visible');
       });
 
-      document.getElementById(`isbn-fetch-${book.id}`)?.addEventListener('click', async () => {
-        const input = document.getElementById(`isbn-input-${book.id}`);
-        const fetchBtn = document.getElementById(`isbn-fetch-${book.id}`);
+      card.querySelector('.isbn-fetch-btn').addEventListener('click', async () => {
+        const input = card.querySelector('.isbn-input');
+        const fetchBtn = card.querySelector('.isbn-fetch-btn');
         const isbn = input.value.trim();
         if (!isbn) return;
 
