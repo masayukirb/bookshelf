@@ -865,6 +865,7 @@
       <button class="onedrive-btn" id="onedriveBtn">☁ OneDriveと連携</button>
       <button class="onedrive-btn" id="importBtn" style="display:none;background:#005a9e;box-shadow:3px 3px 0 #003a6e;">📥 PDFを取り込む</button>
       <button class="index-sync-btn" id="indexSyncBtn">⇅ 蔵書データを同期</button>
+      <button class="index-sync-btn" id="migrateBtn" style="display:none;border-color:#c0392b;color:#c0392b;">🔧 更新日時を一括付与</button>
       <button class="logout-btn" id="logoutBtn">⏏ ログアウト</button>
       <button class="add-btn" id="addBtn">＋ PDFを追加</button>
     </div>
@@ -951,6 +952,7 @@
   const logoutBtn = document.getElementById('logoutBtn');
   const indexSyncBtn = document.getElementById('indexSyncBtn');
   const importBtn = document.getElementById('importBtn');
+  const migrateBtn = document.getElementById('migrateBtn');
 
   // --- IndexedDB 初期化 ---
   function openDB() {
@@ -1295,8 +1297,8 @@
   async function uploadIndexToOneDrive(token) {
     const indexFolder = getSavedIndexFolder();
     const url = getIndexUploadUrl(indexFolder);
-    const data = books.map(({ id, name, numPages, authors, publisher, coverUrl, oneDriveId, oneDriveWebUrl, addedAt, pages }) => ({
-      id, name, numPages, authors, publisher, coverUrl, oneDriveId, oneDriveWebUrl, addedAt, pages
+    const data = books.map(({ id, name, numPages, authors, publisher, coverUrl, oneDriveId, oneDriveWebUrl, addedAt, updatedAt, ndc, pages }) => ({
+      id, name, numPages, authors, publisher, coverUrl, oneDriveId, oneDriveWebUrl, addedAt, updatedAt, ndc, pages
     }));
     const res = await fetch(url, {
       method: 'PUT',
@@ -1344,19 +1346,30 @@
       const remoteBooks = await downloadIndexFromOneDrive(accessToken);
 
       if (remoteBooks && remoteBooks.length > 0) {
-        // マージ：リモートにあってローカルにない書籍を追加
-        let added = 0;
+        // マージ：リモートを基準に新規追加 or 更新日時が新しければ上書き
+        let added = 0, updated = 0;
         for (const remoteBook of remoteBooks) {
-          if (!books.find(b => b.name === remoteBook.name)) {
+          const local = books.find(b => b.name === remoteBook.name);
+          if (!local) {
+            // ローカルにない → 追加
             await dbPut(remoteBook);
             books.push(remoteBook);
             added++;
+          } else {
+            // 両方にある → updatedAtを比較して新しい方を採用
+            const remoteTime = new Date(remoteBook.updatedAt || remoteBook.addedAt).getTime();
+            const localTime  = new Date(local.updatedAt  || local.addedAt).getTime();
+            if (remoteTime > localTime) {
+              Object.assign(local, remoteBook);
+              await dbPut(local);
+              updated++;
+            }
           }
         }
-        if (added > 0) {
+        if (added > 0 || updated > 0) {
           books.sort((a, b) => new Date(a.addedAt) - new Date(b.addedAt));
           renderBooks(searchInput.value.trim());
-          setOnedriveStatus(`📥 ${added}冊を他の端末から取り込みました。インデックスを更新中…`);
+          setOnedriveStatus(`📥 ${added}冊追加・${updated}冊更新しました。インデックスを書き出し中…`);
         }
       }
 
@@ -1374,6 +1387,25 @@
       setOnedriveStatus('⚠ インデックス同期に失敗しました', true);
     }
   }
+
+  // --- 更新日時の一括付与（移行用） ---
+  migrateBtn.addEventListener('click', async () => {
+    if (!confirm(`${books.length}冊全てに現在時刻の更新日時を付与します。\nこの端末の書誌情報・NDCが「最新」として他の端末に同期されます。\n実行しますか？`)) return;
+
+    migrateBtn.textContent = '⏳ 処理中…';
+    migrateBtn.disabled = true;
+
+    const now = new Date().toISOString();
+    for (const book of books) {
+      if (!book.updatedAt) {
+        book.updatedAt = now;
+        await dbPut(book);
+      }
+    }
+
+    migrateBtn.style.display = 'none';
+    setOnedriveStatus(`✓ ${books.length}冊に更新日時を付与しました。「蔵書データを同期」を押してOneDriveに反映してください。`);
+  });
 
   indexSyncBtn.addEventListener('click', syncIndex);
 
@@ -1777,6 +1809,7 @@
       card.querySelector('.ndc-save-btn').addEventListener('click', async () => {
         const code = card.querySelector('.ndc-input').value.trim().padStart(3, '0');
         book.ndc = code || null;
+        book.updatedAt = new Date().toISOString();
         await dbPut(book);
         renderBooks(searchInput.value.trim());
       });
@@ -1813,6 +1846,7 @@
         if (info.authors)   book.authors   = info.authors;
         if (info.publisher) book.publisher = info.publisher;
         if (info.coverUrl)  book.coverUrl  = info.coverUrl;
+        book.updatedAt = new Date().toISOString();
         await dbPut(book);
         renderBooks(searchInput.value.trim());
       });
@@ -1922,6 +1956,12 @@
     books = await dbGetAll();
     books.sort((a, b) => new Date(a.addedAt) - new Date(b.addedAt));
     renderBooks('');
+
+    // updatedAt未設定の書籍があれば一括付与ボタンを表示
+    const needsMigration = books.some(b => !b.updatedAt);
+    if (needsMigration) {
+      migrateBtn.style.display = 'flex';
+    }
 
     // 書誌情報が未取得の書籍があれば非同期でバックグラウンド取得
     const needsFetch = books.filter(b => b.authors === undefined && b.coverUrl === undefined);
