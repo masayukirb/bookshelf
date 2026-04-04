@@ -1808,9 +1808,12 @@
 
       card.querySelector('.ndc-save-btn').addEventListener('click', async () => {
         const code = card.querySelector('.ndc-input').value.trim().padStart(3, '0');
-        book.ndc = code || null;
-        book.updatedAt = new Date().toISOString();
-        await dbPut(book);
+        const target = books.find(b => b.id === book.id);
+        if (target) {
+          target.ndc = code || null;
+          target.updatedAt = new Date().toISOString();
+          await dbPut(target);
+        }
         renderBooks(searchInput.value.trim());
       });
 
@@ -1842,12 +1845,15 @@
           return;
         }
 
-        // 書誌情報を上書き
-        if (info.authors)   book.authors   = info.authors;
-        if (info.publisher) book.publisher = info.publisher;
-        if (info.coverUrl)  book.coverUrl  = info.coverUrl;
-        book.updatedAt = new Date().toISOString();
-        await dbPut(book);
+        // 書誌情報を上書き（books配列の参照を直接更新）
+        const target = books.find(b => b.id === book.id);
+        if (target) {
+          if (info.authors)   target.authors   = info.authors;
+          if (info.publisher) target.publisher = info.publisher;
+          if (info.coverUrl)  target.coverUrl  = info.coverUrl.replace('http://', 'https://');
+          target.updatedAt = new Date().toISOString();
+          await dbPut(target);
+        }
         renderBooks(searchInput.value.trim());
       });
 
