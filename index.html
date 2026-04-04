@@ -865,7 +865,7 @@
       <button class="onedrive-btn" id="onedriveBtn">☁ OneDriveと連携</button>
       <button class="onedrive-btn" id="importBtn" style="display:none;background:#005a9e;box-shadow:3px 3px 0 #003a6e;">📥 PDFを取り込む</button>
       <button class="index-sync-btn" id="indexSyncBtn">⇅ 蔵書データを同期</button>
-      <button class="index-sync-btn" id="migrateBtn" style="display:none;border-color:#c0392b;color:#c0392b;">🔧 更新日時を一括付与</button>
+      <button class="index-sync-btn" id="migrateBtn" style="border-color:#c0392b;color:#c0392b;">🔧 更新日時を一括付与</button>
       <button class="logout-btn" id="logoutBtn">⏏ ログアウト</button>
       <button class="add-btn" id="addBtn">＋ PDFを追加</button>
     </div>
@@ -1403,7 +1403,7 @@
       }
     }
 
-    migrateBtn.style.display = 'none';
+    migrateBtn.classList.remove('visible');
     setOnedriveStatus(`✓ ${books.length}冊に更新日時を付与しました。「蔵書データを同期」を押してOneDriveに反映してください。`);
   });
 
@@ -1966,7 +1966,7 @@
     // updatedAt未設定の書籍があれば一括付与ボタンを表示
     const needsMigration = books.some(b => !b.updatedAt);
     if (needsMigration) {
-      migrateBtn.style.display = 'flex';
+      migrateBtn.classList.add('visible');
     }
 
     // 書誌情報が未取得の書籍があれば非同期でバックグラウンド取得
