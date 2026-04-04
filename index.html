@@ -908,6 +908,8 @@
       await logout();
     }
   });
+
+  function setOnedriveStatus(msg, isError = false, showReset = false) {
     onedriveStatus.innerHTML = escHtml(msg)
       + (showReset ? ' <span id="resetFolderLink" style="cursor:pointer;text-decoration:underline;color:var(--accent);margin-left:8px;">フォルダを変更</span>' : '');
     onedriveStatus.classList.add('visible');
