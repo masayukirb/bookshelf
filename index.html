@@ -1007,7 +1007,18 @@ to { opacity: 1; transform: translateY(0); }
 /* モーダル共通：最前面に */
 .edit-modal-overlay {
 z-index: 9999 !important;
+-webkit-transform: translateZ(0);
+transform: translateZ(0);
 }
+
+.modal-overlay {
+z-index: 9999 !important;
+-webkit-transform: translateZ(0);
+transform: translateZ(0);
+}
+
+/* body直下にモーダルを持つためcontainerのz-indexを明示 */
+.container { isolation: isolate; }
 </style>
 
 </head>
@@ -1029,14 +1040,18 @@ z-index: 9999 !important;
 
   <div class="toolbar">
     <div class="book-count"><strong id="countNum">0</strong> 冊の蔵書</div>
-    <div style="display:flex;gap:10px;flex-wrap:wrap;">
-      <button class="onedrive-btn" id="onedriveBtn">☁ OneDriveと連携</button>
-      <button class="onedrive-btn" id="importBtn" style="display:none;background:#005a9e;box-shadow:3px 3px 0 #003a6e;">📥 PDFを取り込む</button>
-      <button class="index-sync-btn" id="indexSyncBtn">⇅ 蔵書データを同期</button>
-      <button class="index-sync-btn" id="migrateBtn" style="border-color:#c0392b;color:#c0392b;">🔧 更新日時を一括付与</button>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;width:100%;">
+      <!-- OneDrive系 -->
+      <button class="onedrive-btn" id="onedriveBtn">☁ OneDrive連携</button>
+      <button class="onedrive-btn" id="importBtn" style="display:none;background:#005a9e;box-shadow:3px 3px 0 #003a6e;">📥 PDF取り込む</button>
+      <button class="index-sync-btn" id="indexSyncBtn">⇅ 同期</button>
       <button class="logout-btn" id="logoutBtn">⏏ ログアウト</button>
-      <button class="add-btn" id="scanBtn">📷 書誌を登録</button>
-      <button class="add-btn" id="addBtn">＋ PDFを追加</button>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;width:100%;">
+      <!-- 登録系 -->
+      <button class="add-btn" id="scanBtn">📷 書誌登録</button>
+      <button class="add-btn" id="addBtn">＋ PDF追加</button>
+      <button class="index-sync-btn" id="migrateBtn" style="border-color:#c0392b;color:#c0392b;">🔧 更新日時付与</button>
     </div>
     <input type="file" id="fileInput" accept="application/pdf" multiple>
   </div>
@@ -1059,118 +1074,9 @@ z-index: 9999 !important;
   <footer>BOOKSHELF PROTOTYPE · PDF.js · Google Books API · OneDrive（Microsoft Graph API）· IndexedDB永続保存</footer>
 </div>
 
-<!-- 書誌情報編集モーダル -->
-
-<div class="edit-modal-overlay" id="editModal">
-  <div class="edit-modal">
-    <div class="edit-modal-header">
-      <div class="edit-modal-title">✏️ 書誌情報を編集</div>
-      <button class="modal-close" id="editModalClose">✕</button>
-    </div>
-    <div class="edit-modal-body">
-      <div class="edit-field">
-        <label class="edit-label">書名</label>
-        <input class="edit-input" id="editName" type="text" placeholder="書名">
-      </div>
-      <div class="edit-field">
-        <label class="edit-label">著者</label>
-        <input class="edit-input" id="editAuthors" type="text" placeholder="著者名">
-      </div>
-      <div class="edit-field">
-        <label class="edit-label">出版社</label>
-        <input class="edit-input" id="editPublisher" type="text" placeholder="出版社">
-      </div>
-      <div class="edit-field">
-        <label class="edit-label">書影URL</label>
-        <input class="edit-input" id="editCoverUrl" type="text" placeholder="https://...">
-        <div class="edit-cover-preview">
-          <div id="editCoverPreview" class="edit-cover-none">📖</div>
-          <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);">URLを入力すると書影が確認できます</span>
-        </div>
-      </div>
-    </div>
-    <div class="edit-modal-footer">
-      <button class="edit-btn-clear" id="editBtnClearCover">書影を削除</button>
-      <button class="edit-btn-cancel" id="editModalCancel">キャンセル</button>
-      <button class="edit-btn-save" id="editModalSave">保存</button>
-    </div>
-  </div>
-</div>
-
-<!-- バーコード登録モーダル -->
-
-<div class="edit-modal-overlay" id="scanModal">
-  <div class="edit-modal">
-    <div class="edit-modal-header">
-      <div class="edit-modal-title">📷 書誌を登録</div>
-      <button class="modal-close" id="scanModalClose">✕</button>
-    </div>
-    <div class="edit-modal-body">
-      <div class="edit-field">
-        <label class="edit-label">バーコードをカメラでスキャン</label>
-        <div id="scanViewport" style="position:relative;width:100%;max-width:360px;margin:0 auto;display:none;">
-          <video id="scanVideo" style="width:100%;border:2px solid var(--rule);" autoplay playsinline muted></video>
-          <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:80%;height:2px;background:var(--accent);opacity:0.7;"></div>
-        </div>
-        <div style="display:flex;gap:8px;margin-top:8px;">
-          <button class="isbn-fetch-btn" id="scanStartBtn" style="padding:8px 16px;font-size:13px;">カメラを起動</button>
-          <button class="isbn-cancel-btn" id="scanStopBtn" style="display:none;padding:8px 16px;font-size:13px;">カメラを停止</button>
-        </div>
-      </div>
-      <div style="display:flex;align-items:center;gap:10px;">
-        <div style="flex:1;height:1px;background:var(--rule);"></div>
-        <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);">または</span>
-        <div style="flex:1;height:1px;background:var(--rule);"></div>
-      </div>
-      <div class="edit-field">
-        <label class="edit-label">ISBNを手入力</label>
-        <div style="display:flex;gap:8px;">
-          <input class="edit-input" id="scanIsbnInput" type="text" placeholder="978-4-..." maxlength="17" style="flex:1;">
-          <button class="isbn-fetch-btn" id="scanIsbnFetch" style="padding:8px 14px;font-size:13px;">検索</button>
-        </div>
-      </div>
-      <div id="scanResult" style="display:none;">
-        <div style="height:1px;background:var(--rule);margin-bottom:12px;"></div>
-        <div style="display:flex;gap:14px;align-items:flex-start;">
-          <img id="scanResultCover" style="width:56px;height:78px;object-fit:cover;border:1px solid var(--rule);flex-shrink:0;" src="" alt="">
-          <div style="min-width:0;">
-            <div id="scanResultTitle" style="font-size:15px;font-weight:600;margin-bottom:4px;"></div>
-            <div id="scanResultAuthor" style="font-size:12px;color:var(--muted);margin-bottom:2px;"></div>
-            <div id="scanResultPublisher" style="font-family:'DM Mono',monospace;font-size:11px;color:var(--rule);"></div>
-          </div>
-        </div>
-        <div id="scanDuplicateWarn" style="display:none;margin-top:10px;font-family:'DM Mono',monospace;font-size:11px;color:var(--accent);">⚠ すでに登録済みです</div>
-      </div>
-    </div>
-    <div class="edit-modal-footer">
-      <button class="edit-btn-cancel" id="scanModalCancel">閉じる</button>
-      <button class="edit-btn-save" id="scanModalSave" disabled>書誌を登録</button>
-    </div>
-  </div>
-</div>
-
 <!-- ZXing バーコードライブラリ -->
 
 <script src="https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/umd/index.min.js"></script>
-
-<div class="modal-overlay" id="folderModal" style="display:none;">
-  <div class="modal">
-    <div class="modal-header">
-      <div class="modal-title">📂 同期するフォルダを選択</div>
-      <button class="modal-close" id="folderModalClose">✕</button>
-    </div>
-    <div class="modal-body">
-      <div class="modal-hint">フォルダを選択してください。サブフォルダ内のPDFも自動で取り込まれます。</div>
-      <div class="folder-breadcrumb" id="folderBreadcrumb"></div>
-      <div class="folder-list" id="folderList"><div class="folder-loading">読み込み中…</div></div>
-    </div>
-    <div class="modal-footer">
-      <div class="modal-selected-label" id="selectedFolderLabel">フォルダが選択されていません</div>
-      <button class="btn-cancel" id="folderModalCancel">キャンセル</button>
-      <button class="btn-confirm" id="folderModalConfirm" disabled>このフォルダを使う</button>
-    </div>
-  </div>
-</div>
 
 <script type="module">
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
@@ -2528,6 +2434,119 @@ z-index: 9999 !important;
 
   init();
 </script>
+
+<!-- 全モーダルをbody末尾に配置（iOS Safari fixed対策） -->
+
+<!-- 書誌情報編集モーダル -->
+
+<div class="edit-modal-overlay" id="editModal">
+  <div class="edit-modal">
+    <div class="edit-modal-header">
+      <div class="edit-modal-title">✏️ 書誌情報を編集</div>
+      <button class="modal-close" id="editModalClose">✕</button>
+    </div>
+    <div class="edit-modal-body">
+      <div class="edit-field">
+        <label class="edit-label">書名</label>
+        <input class="edit-input" id="editName" type="text" placeholder="書名">
+      </div>
+      <div class="edit-field">
+        <label class="edit-label">著者</label>
+        <input class="edit-input" id="editAuthors" type="text" placeholder="著者名">
+      </div>
+      <div class="edit-field">
+        <label class="edit-label">出版社</label>
+        <input class="edit-input" id="editPublisher" type="text" placeholder="出版社">
+      </div>
+      <div class="edit-field">
+        <label class="edit-label">書影URL</label>
+        <input class="edit-input" id="editCoverUrl" type="text" placeholder="https://...">
+        <div class="edit-cover-preview">
+          <div id="editCoverPreview" class="edit-cover-none">📖</div>
+          <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);">URLを入力すると書影が確認できます</span>
+        </div>
+      </div>
+    </div>
+    <div class="edit-modal-footer">
+      <button class="edit-btn-clear" id="editBtnClearCover">書影を削除</button>
+      <button class="edit-btn-cancel" id="editModalCancel">キャンセル</button>
+      <button class="edit-btn-save" id="editModalSave">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- バーコード登録モーダル -->
+
+<div class="edit-modal-overlay" id="scanModal">
+  <div class="edit-modal">
+    <div class="edit-modal-header">
+      <div class="edit-modal-title">📷 書誌を登録</div>
+      <button class="modal-close" id="scanModalClose">✕</button>
+    </div>
+    <div class="edit-modal-body">
+      <div class="edit-field">
+        <label class="edit-label">バーコードをカメラでスキャン</label>
+        <div id="scanViewport" style="position:relative;width:100%;max-width:360px;margin:0 auto;display:none;">
+          <video id="scanVideo" style="width:100%;border:2px solid var(--rule);" autoplay playsinline muted></video>
+          <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:80%;height:2px;background:var(--accent);opacity:0.7;"></div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:8px;">
+          <button class="isbn-fetch-btn" id="scanStartBtn" style="padding:8px 16px;font-size:13px;">カメラを起動</button>
+          <button class="isbn-cancel-btn" id="scanStopBtn" style="display:none;padding:8px 16px;font-size:13px;">カメラを停止</button>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="flex:1;height:1px;background:var(--rule);"></div>
+        <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);">または</span>
+        <div style="flex:1;height:1px;background:var(--rule);"></div>
+      </div>
+      <div class="edit-field">
+        <label class="edit-label">ISBNを手入力</label>
+        <div style="display:flex;gap:8px;">
+          <input class="edit-input" id="scanIsbnInput" type="text" placeholder="978-4-..." maxlength="17" style="flex:1;">
+          <button class="isbn-fetch-btn" id="scanIsbnFetch" style="padding:8px 14px;font-size:13px;">検索</button>
+        </div>
+      </div>
+      <div id="scanResult" style="display:none;">
+        <div style="height:1px;background:var(--rule);margin-bottom:12px;"></div>
+        <div style="display:flex;gap:14px;align-items:flex-start;">
+          <img id="scanResultCover" style="width:56px;height:78px;object-fit:cover;border:1px solid var(--rule);flex-shrink:0;" src="" alt="">
+          <div style="min-width:0;">
+            <div id="scanResultTitle" style="font-size:15px;font-weight:600;margin-bottom:4px;"></div>
+            <div id="scanResultAuthor" style="font-size:12px;color:var(--muted);margin-bottom:2px;"></div>
+            <div id="scanResultPublisher" style="font-family:'DM Mono',monospace;font-size:11px;color:var(--rule);"></div>
+          </div>
+        </div>
+        <div id="scanDuplicateWarn" style="display:none;margin-top:10px;font-family:'DM Mono',monospace;font-size:11px;color:var(--accent);">⚠ すでに登録済みです</div>
+      </div>
+    </div>
+    <div class="edit-modal-footer">
+      <button class="edit-btn-cancel" id="scanModalCancel">閉じる</button>
+      <button class="edit-btn-save" id="scanModalSave" disabled>書誌を登録</button>
+    </div>
+  </div>
+</div>
+
+<!-- フォルダ選択モーダル -->
+
+<div class="modal-overlay" id="folderModal" style="display:none;">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">📂 同期するフォルダを選択</div>
+      <button class="modal-close" id="folderModalClose">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-hint">フォルダを選択してください。サブフォルダ内のPDFも自動で取り込まれます。</div>
+      <div class="folder-breadcrumb" id="folderBreadcrumb"></div>
+      <div class="folder-list" id="folderList"><div class="folder-loading">読み込み中…</div></div>
+    </div>
+    <div class="modal-footer">
+      <div class="modal-selected-label" id="selectedFolderLabel">フォルダが選択されていません</div>
+      <button class="btn-cancel" id="folderModalCancel">キャンセル</button>
+      <button class="btn-confirm" id="folderModalConfirm" disabled>このフォルダを使う</button>
+    </div>
+  </div>
+</div>
 
 </body>
 </html>
