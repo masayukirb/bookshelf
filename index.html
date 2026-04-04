@@ -803,6 +803,7 @@
     <div class="book-count"><strong id="countNum">0</strong> 冊の蔵書</div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;">
       <button class="onedrive-btn" id="onedriveBtn">☁ OneDriveと連携</button>
+      <button class="onedrive-btn" id="importBtn" style="display:none;background:#005a9e;box-shadow:3px 3px 0 #003a6e;">📥 PDFを取り込む</button>
       <button class="index-sync-btn" id="indexSyncBtn">⇅ 蔵書データを同期</button>
       <button class="logout-btn" id="logoutBtn">⏏ ログアウト</button>
       <button class="add-btn" id="addBtn">＋ PDFを追加</button>
@@ -889,6 +890,7 @@
   const onedriveStatus = document.getElementById('onedriveStatus');
   const logoutBtn = document.getElementById('logoutBtn');
   const indexSyncBtn = document.getElementById('indexSyncBtn');
+  const importBtn = document.getElementById('importBtn');
 
   // --- IndexedDB 初期化 ---
   function openDB() {
@@ -985,6 +987,7 @@
     onedriveBtn.classList.add('connected');
     logoutBtn.classList.add('visible');
     indexSyncBtn.classList.add('visible');
+    importBtn.style.display = 'flex';
   }
 
   function setLoggedOut() {
@@ -994,6 +997,7 @@
     onedriveBtn.classList.remove('connected');
     logoutBtn.classList.remove('visible');
     indexSyncBtn.classList.remove('visible');
+    importBtn.style.display = 'none';
   }
 
   async function logout() {
@@ -1297,16 +1301,35 @@
       onedriveBtn.disabled = true;
 
       accessToken = await getAccessToken();
+      setLoggedIn(msalAccount);
+      onedriveBtn.disabled = false;
+
+      // ログイン済みの場合はここで終了（PDF取り込みはimportFromOneDrive()）
+      const saved = getSavedFolder();
+      const savedIdx = getSavedIndexFolder();
+      const folderLabel = saved ? `PDFフォルダ：${saved.path || saved.name}` : 'PDFフォルダ未設定';
+      const idxLabel = savedIdx ? `インデックス：${savedIdx.path || savedIdx.name}` : 'インデックスフォルダ未設定';
+      setOnedriveStatus(`接続済み：${msalAccount.username} · ${folderLabel} · ${idxLabel}`);
+
+    } catch(e) {
+      console.error('OneDrive連携エラー:', e);
+      onedriveBtn.textContent = '☁ OneDriveと連携';
+      onedriveBtn.disabled = false;
+      setOnedriveStatus('⚠ 連携に失敗しました。再度お試しください。', true);
+    }
+  }
+
+  // --- OneDrive PDFインポート処理（別関数に分離） ---
+  async function importFromOneDrive() {
+    try {
+      if (!accessToken) accessToken = await getAccessToken();
 
       // フォルダ設定を確認：未設定なら選択モーダルを開く
       let folder = getSavedFolder();
       if (!folder) {
         setOnedriveStatus('📂 同期するフォルダを選択してください…');
-        folder = await openFolderPicker(accessToken);
+        folder = await openFolderPicker(accessToken, 'PDFフォルダを選択');
         if (!folder) {
-          // キャンセル
-          onedriveBtn.textContent = '☁ OneDriveと連携';
-          onedriveBtn.disabled = false;
           setOnedriveStatus('フォルダの選択がキャンセルされました');
           return;
         }
@@ -1322,11 +1345,8 @@
         return !books.find(b => b.name === name);
       });
 
-      setLoggedIn(msalAccount);
-      onedriveBtn.disabled = false;
-
       if (newItems.length === 0) {
-        setOnedriveStatus(`✓ 同期完了 — 新しいPDFはありませんでした（フォルダ：${folder.path || folder.name}）`);
+        setOnedriveStatus(`✓ 確認完了 — 新しいPDFはありませんでした（フォルダ：${folder.path || folder.name}）`);
         return;
       }
 
@@ -1354,6 +1374,7 @@
 
           progressLabel.textContent = `書誌情報を取得中：${name}`;
           const bookInfo = await fetchBookInfo(name);
+          const ndcCode = classifyNDC({ name, authors: bookInfo?.authors, publisher: bookInfo?.publisher });
 
           const book = {
             id: Date.now() + Math.random(),
@@ -1363,6 +1384,7 @@
             authors: bookInfo?.authors || null,
             publisher: bookInfo?.publisher || null,
             coverUrl: bookInfo?.coverUrl || null,
+            ndc: ndcCode,
             oneDriveId: item.id,
             oneDriveWebUrl: item.webUrl || null,
             addedAt: new Date().toISOString()
@@ -1382,21 +1404,18 @@
         progressFill.style.width = '0%';
       }, 600);
 
-      setOnedriveStatus(`✓ OneDrive同期完了 — ${newItems.length}冊を「${folder.name}」から取り込みました`, false, true);
+      setOnedriveStatus(`✓ 取込完了 — ${newItems.length}冊を「${folder.name}」から取り込みました`, false, true);
 
       // インデックスをOneDriveに自動書き出し
       try {
         await uploadIndexToOneDrive(accessToken);
-        setOnedriveStatus(`✓ 同期完了 — ${newItems.length}冊取り込み・インデックスをOneDriveに保存しました`, false, true);
       } catch(e) {
         console.warn('インデックス自動保存失敗:', e);
       }
 
     } catch(e) {
-      console.error('OneDrive連携エラー:', e);
-      onedriveBtn.textContent = '☁ OneDriveと連携';
-      onedriveBtn.disabled = false;
-      setOnedriveStatus('⚠ 連携に失敗しました。再度お試しください。', true);
+      console.error('PDFインポートエラー:', e);
+      setOnedriveStatus('⚠ PDF取り込みに失敗しました。再度お試しください。', true);
     }
   }
 
@@ -1515,16 +1534,18 @@
 
   function classifyNDC(book) {
     const text = [book.name, book.authors || '', book.publisher || ''].join(' ');
-
     for (const rule of NDC_RULES) {
       for (const pattern of rule.patterns) {
-        if (text.includes(pattern)) {
-          return rule.code;
-        }
+        if (text.includes(pattern)) return rule.code;
       }
     }
-    // マッチしなければ320（法律一般）をデフォルトとして返す
     return '320';
+  }
+
+  function getNdcLabel(code) {
+    if (!code) return null;
+    const c = String(code).padStart(3, '0');
+    return NDC[c] ? `${c} ${NDC[c]}` : c;
   }
 
   // --- 検索 ---
@@ -1740,6 +1761,7 @@
   });
 
   onedriveBtn.addEventListener('click', syncOneDrive);
+  importBtn.addEventListener('click', importFromOneDrive);
 
   // 削除
   bookList.addEventListener('click', async e => {
