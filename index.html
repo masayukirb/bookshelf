@@ -984,6 +984,29 @@ to { opacity: 1; transform: translateY(0); }
 .book-card { grid-template-columns: 32px 52px 1fr auto; gap: 10px; }
 .book-cover, .book-cover-placeholder, .cover-loading { width: 52px; height: 72px; }
 .book-title { font-size: 15px; }
+
+```
+/* ツールバーをコンパクトに */
+.toolbar { gap: 8px; }
+.toolbar > div { gap: 6px; width: 100%; }
+.add-btn, .onedrive-btn, .index-sync-btn, .logout-btn {
+  padding: 8px 10px;
+  font-size: 12px;
+  flex: 1;
+  justify-content: center;
+  min-width: 0;
+  box-shadow: 2px 2px 0 var(--accent);
+}
+.onedrive-btn { box-shadow: 2px 2px 0 #004e8c; }
+.onedrive-btn.connected { box-shadow: 2px 2px 0 #054b05; }
+.logout-btn { flex: 0 0 auto; }
+```
+
+}
+
+/* モーダル共通：最前面に */
+.edit-modal-overlay {
+z-index: 9999 !important;
 }
 </style>
 
