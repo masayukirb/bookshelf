@@ -668,6 +668,66 @@
     cursor: pointer;
   }
 
+  /* ISBN修正UI */
+  .isbn-edit-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 11px;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    padding: 0;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  .isbn-edit-btn:hover { color: var(--accent); }
+
+  .isbn-edit-row {
+    display: none;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+    flex-wrap: wrap;
+  }
+
+  .isbn-edit-row.visible { display: flex; }
+
+  .isbn-input {
+    width: 140px;
+    padding: 3px 6px;
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    border: 1px solid var(--rule);
+    background: white;
+    color: var(--ink);
+    outline: none;
+  }
+
+  .isbn-input:focus { border-color: var(--accent); }
+
+  .isbn-fetch-btn {
+    padding: 3px 10px;
+    background: var(--ink);
+    color: var(--paper);
+    border: none;
+    font-family: 'Shippori Mincho', serif;
+    font-size: 11px;
+    cursor: pointer;
+  }
+
+  .isbn-fetch-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .isbn-cancel-btn {
+    padding: 3px 8px;
+    background: none;
+    color: var(--muted);
+    border: 1px solid var(--rule);
+    font-family: 'Shippori Mincho', serif;
+    font-size: 11px;
+    cursor: pointer;
+  }
+
   .book-title {
     font-size: 18px;
     font-weight: 600;
@@ -964,6 +1024,29 @@
         : null,
       googleBooksId: item.id || null,
     };
+  }
+
+  // ISBNで書誌情報を取得
+  async function fetchBookInfoByISBN(isbn) {
+    try {
+      const clean = isbn.replace(/[-\s]/g, '');
+      const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${clean}&maxResults=1`);
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (!data.items || !data.items.length) return null;
+      const item = data.items[0];
+      const info = item.volumeInfo || {};
+      return {
+        name: info.title || null,
+        authors: (info.authors || []).join(', ') || null,
+        publisher: info.publisher || null,
+        coverUrl: info.imageLinks
+          ? (info.imageLinks.thumbnail || info.imageLinks.smallThumbnail || null)
+          : null,
+      };
+    } catch(e) {
+      return null;
+    }
   }
 
   // --- Microsoft / OneDrive 認証 ---
@@ -1642,6 +1725,14 @@
       const publisherHTML = book.publisher
         ? `<div class="book-publisher">${escHtml(book.publisher)}</div>` : '';
 
+      // ISBN修正UI
+      const isbnHTML = `
+        <div class="isbn-edit-row" id="isbn-edit-${book.id}">
+          <input class="isbn-input" type="text" placeholder="ISBN（ハイフン不要）" id="isbn-input-${book.id}" maxlength="17">
+          <button class="isbn-fetch-btn" id="isbn-fetch-${book.id}">取得</button>
+          <button class="isbn-cancel-btn" id="isbn-cancel-${book.id}">キャンセル</button>
+        </div>`;
+
       // NDCバッジ＋手動修正UI
       const ndcLabel = getNdcLabel(book.ndc);
       const ndcHTML = `
@@ -1665,7 +1756,8 @@
           ${authorHTML}
           ${publisherHTML}
           ${ndcHTML}
-          <div class="book-meta">${book.numPages}ページ · 登録日 ${formatDate(book.addedAt)} ${queryBadge}</div>
+          <div class="book-meta">${book.numPages}ページ · 登録日 ${formatDate(book.addedAt)} ${queryBadge} <button class="isbn-edit-btn" data-id="${book.id}">ISBNで修正</button></div>
+          ${isbnHTML}
           ${hitsHTML}
         </div>
         <button class="delete-btn" data-id="${book.id}" title="削除">✕</button>`;
@@ -1686,6 +1778,43 @@
         const input = document.getElementById(`ndc-input-${book.id}`);
         const code = input.value.trim().padStart(3, '0');
         book.ndc = code || null;
+        await dbPut(book);
+        renderBooks(searchInput.value.trim());
+      });
+
+      // ISBN修正イベント
+      card.querySelector('.isbn-edit-btn').addEventListener('click', () => {
+        const row = document.getElementById(`isbn-edit-${book.id}`);
+        row.classList.add('visible');
+        document.getElementById(`isbn-input-${book.id}`).focus();
+      });
+
+      document.getElementById(`isbn-cancel-${book.id}`)?.addEventListener('click', () => {
+        document.getElementById(`isbn-edit-${book.id}`).classList.remove('visible');
+      });
+
+      document.getElementById(`isbn-fetch-${book.id}`)?.addEventListener('click', async () => {
+        const input = document.getElementById(`isbn-input-${book.id}`);
+        const fetchBtn = document.getElementById(`isbn-fetch-${book.id}`);
+        const isbn = input.value.trim();
+        if (!isbn) return;
+
+        fetchBtn.textContent = '取得中…';
+        fetchBtn.disabled = true;
+
+        const info = await fetchBookInfoByISBN(isbn);
+        if (!info) {
+          fetchBtn.textContent = '取得';
+          fetchBtn.disabled = false;
+          input.style.borderColor = 'var(--accent)';
+          input.placeholder = '見つかりませんでした';
+          return;
+        }
+
+        // 書誌情報を上書き
+        if (info.authors)   book.authors   = info.authors;
+        if (info.publisher) book.publisher = info.publisher;
+        if (info.coverUrl)  book.coverUrl  = info.coverUrl;
         await dbPut(book);
         renderBooks(searchInput.value.trim());
       });
