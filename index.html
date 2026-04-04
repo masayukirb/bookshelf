@@ -1088,7 +1088,7 @@
 </div>
 
 <!-- ZXing バーコードライブラリ -->
-<script src="https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/umd/index.min.js"></script>
+<script src="https://unpkg.com/@zxing/browser@0.1.5/umd/index.min.js"></script>
 
 <script type="module">
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
@@ -1410,13 +1410,14 @@
 
   // カメラ起動
   scanStartBtn.addEventListener('click', async () => {
-    if (!window.ZXingBrowser) {
+    const ZXing = window.ZXingBrowser || window.ZXing;
+    if (!ZXing || !ZXing.BrowserMultiFormatReader) {
       alert('バーコードライブラリの読み込みに失敗しました。ページを再読込してください。');
       return;
     }
     try {
-      codeReader = new ZXingBrowser.BrowserMultiFormatReader();
-      const devices = await ZXingBrowser.BrowserMultiFormatReader.listVideoInputDevices();
+      codeReader = new ZXing.BrowserMultiFormatReader();
+      const devices = await ZXing.BrowserMultiFormatReader.listVideoInputDevices();
       const deviceId = devices.length > 0 ? devices[devices.length - 1].deviceId : undefined;
       scanViewport.style.display = 'block';
       scanStartBtn.style.display = 'none';
@@ -1432,6 +1433,7 @@
         }
       });
     } catch(e) {
+      console.error('カメラエラー:', e);
       alert('カメラを起動できませんでした。\nブラウザの設定でカメラの許可を確認してください。');
     }
   });
