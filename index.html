@@ -1176,55 +1176,55 @@
     });
   }
 
-  // --- Open Library API（CORS対応・無料・APIキー不要） ---
+  // --- Google Books API ---
+  const BOOKS_API_KEY = 'AIzaSyDf71ZF5Fwp1cpzAm-XK7IhHZ0E-YbR-y4';
 
-  // ISBNで書誌情報を取得
-  async function fetchBookInfoByISBN(isbn) {
+  function extractBookInfo(item) {
+    const info = item.volumeInfo || {};
+    return {
+      authors: (info.authors || []).join(', ') || null,
+      publisher: info.publisher || null,
+      coverUrl: info.imageLinks
+        ? (info.imageLinks.thumbnail || info.imageLinks.smallThumbnail || null)
+        : null,
+    };
+  }
+
+  // タイトルで書誌情報を取得
+  async function fetchBookInfo(title) {
     try {
-      const clean = isbn.replace(/[-\s]/g, '');
-      const res = await fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${clean}&format=json&jscmd=data`);
+      const q = encodeURIComponent(title.slice(0, 60));
+      const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${q}&maxResults=1&langRestrict=ja&key=${BOOKS_API_KEY}`);
       if (!res.ok) return null;
       const data = await res.json();
-      const key = `ISBN:${clean}`;
-      const book = data[key];
-      if (!book) return null;
-
-      const authors = book.authors
-        ? book.authors.map(a => a.name).join(', ')
-        : null;
-      const publisher = book.publishers
-        ? book.publishers.map(p => p.name).join(', ')
-        : null;
-      const coverUrl = book.cover
-        ? (book.cover.medium || book.cover.small || null)
-        : null;
-
-      return {
-        name: book.title || null,
-        authors,
-        publisher,
-        coverUrl,
-      };
+      if (!data.items || !data.items.length) {
+        const res2 = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${q}&maxResults=1&key=${BOOKS_API_KEY}`);
+        const data2 = await res2.json();
+        if (!data2.items || !data2.items.length) return null;
+        return extractBookInfo(data2.items[0]);
+      }
+      return extractBookInfo(data.items[0]);
     } catch(e) {
       return null;
     }
   }
 
-  // タイトルで書誌情報を取得（Open Library検索）
-  async function fetchBookInfo(title) {
+  // ISBNで書誌情報を取得
+  async function fetchBookInfoByISBN(isbn) {
     try {
-      const q = encodeURIComponent(title.slice(0, 60));
-      const res = await fetch(`https://openlibrary.org/search.json?title=${q}&limit=1&lang=jpn`);
+      const clean = isbn.replace(/[-\s]/g, '');
+      const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${clean}&maxResults=1&key=${BOOKS_API_KEY}`);
       if (!res.ok) return null;
       const data = await res.json();
-      if (!data.docs || !data.docs.length) return null;
-      const doc = data.docs[0];
-      const coverId = doc.cover_i;
+      if (!data.items || !data.items.length) return null;
+      const item = data.items[0];
+      const info = item.volumeInfo || {};
       return {
-        authors: doc.author_name ? doc.author_name.join(', ') : null,
-        publisher: doc.publisher ? doc.publisher[0] : null,
-        coverUrl: coverId
-          ? `https://covers.openlibrary.org/b/id/${coverId}-M.jpg`
+        name: info.title || null,
+        authors: (info.authors || []).join(', ') || null,
+        publisher: info.publisher || null,
+        coverUrl: info.imageLinks
+          ? (info.imageLinks.thumbnail || info.imageLinks.smallThumbnail || null)
           : null,
       };
     } catch(e) {
