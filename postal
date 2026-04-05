@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>レターパック追跡番号スキャナー</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;700;900&family=JetBrains+Mono:wght@400;700&display=swap');
+
+:root {
+–red: #C8002D;
+–red-dark: #8C001F;
+–red-light: #FF1A4A;
+–blue: #003087;
+–blue-light: #1A4FBF;
+–cream: #FAF7F2;
+–ink: #1A1410;
+–gray: #8A8580;
+–light: #EDEAE4;
+–white: #FFFFFF;
+–shadow: 0 4px 24px rgba(0,0,0,0.12);
+}
+
+- { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+font-family: ‘Zen Kaku Gothic New’, sans-serif;
+background: var(–cream);
+color: var(–ink);
+min-height: 100vh;
+}
+
+/* HEADER */
+header {
+background: var(–red);
+color: white;
+padding: 0;
+position: relative;
+overflow: hidden;
+}
+header::before {
+content: ‘’;
+position: absolute;
+top: -30px; right: -30px;
+width: 180px; height: 180px;
+background: var(–red-dark);
+border-radius: 50%;
+opacity: 0.5;
+}
+header::after {
+content: ‘’;
+position: absolute;
+bottom: -20px; left: 40%;
+width: 120px; height: 120px;
+background: var(–red-light);
+border-radius: 50%;
+opacity: 0.2;
+}
+.header-inner {
+padding: 28px 32px 24px;
+position: relative; z-index: 1;
+display: flex; align-items: flex-end; gap: 16px;
+}
+.logo-mark {
+font-size: 36px; line-height: 1;
+}
+.header-text h1 {
+font-size: 22px; font-weight: 900; letter-spacing: 0.05em;
+line-height: 1.1;
+}
+.header-text p {
+font-size: 11px; opacity: 0.8; margin-top: 4px;
+letter-spacing: 0.1em; text-transform: uppercase;
+}
+.badge-row {
+padding: 0 32px 20px;
+position: relative; z-index: 1;
+display: flex; gap: 8px;
+}
+.badge {
+background: rgba(255,255,255,0.15);
+border: 1px solid rgba(255,255,255,0.3);
+color: white;
+font-size: 11px; font-weight: 700;
+padding: 4px 10px; border-radius: 20px;
+letter-spacing: 0.08em;
+}
+.badge.blue { background: var(–blue); border-color: var(–blue-light); }
+
+/* MAIN */
+main { max-width: 720px; margin: 0 auto; padding: 28px 20px 60px; }
+
+/* SCAN SECTION */
+.scan-card {
+background: white;
+border-radius: 16px;
+box-shadow: var(–shadow);
+overflow: hidden;
+margin-bottom: 20px;
+}
+.card-header {
+background: var(–ink);
+color: white;
+padding: 14px 20px;
+display: flex; align-items: center; gap: 10px;
+font-weight: 700; font-size: 14px; letter-spacing: 0.05em;
+}
+.card-header .icon { font-size: 18px; }
+
+/* CAMERA */
+#camera-section { padding: 20px; }
+#video-container {
+position: relative;
+background: #000;
+border-radius: 10px;
+overflow: hidden;
+aspect-ratio: 16/9;
+display: none;
+margin-bottom: 12px;
+}
+#video-container.active { display: block; }
+video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.scan-overlay {
+position: absolute; inset: 0;
+display: flex; align-items: center; justify-content: center;
+pointer-events: none;
+}
+.scan-frame {
+width: 80%; max-width: 380px;
+height: 80px;
+border: 2px solid var(–red);
+border-radius: 6px;
+position: relative;
+}
+.scan-line {
+position: absolute;
+left: 4px; right: 4px;
+height: 2px;
+background: var(–red);
+animation: scanline 2s ease-in-out infinite;
+box-shadow: 0 0 8px var(–red);
+}
+@keyframes scanline {
+0% { top: 10%; }
+50% { top: 85%; }
+100% { top: 10%; }
+}
+.corner {
+position: absolute;
+width: 14px; height: 14px;
+border-color: white;
+border-style: solid;
+}
+.corner.tl { top: -2px; left: -2px; border-width: 3px 0 0 3px; }
+.corner.tr { top: -2px; right: -2px; border-width: 3px 3px 0 0; }
+.corner.bl { bottom: -2px; left: -2px; border-width: 0 0 3px 3px; }
+.corner.br { bottom: -2px; right: -2px; border-width: 0 3px 3px 0; }
+
+.camera-label {
+text-align: center;
+font-size: 12px;
+color: var(–gray);
+margin-bottom: 14px;
+letter-spacing: 0.05em;
+}
+.btn-row { display: flex; gap: 10px; justify-content: center; }
+
+/* BUTTONS */
+.btn {
+display: inline-flex; align-items: center; gap: 6px;
+padding: 10px 20px; border-radius: 8px;
+font-family: inherit; font-weight: 700; font-size: 13px;
+cursor: pointer; border: none; transition: all 0.15s;
+letter-spacing: 0.04em;
+}
+.btn-primary {
+background: var(–red); color: white;
+}
+.btn-primary:hover { background: var(–red-dark); }
+.btn-stop {
+background: var(–ink); color: white;
+}
+.btn-stop:hover { background: #333; }
+.btn-export {
+background: var(–blue); color: white;
+padding: 12px 28px; font-size: 14px; border-radius: 10px;
+}
+.btn-export:hover { background: var(–blue-light); }
+.btn-export:disabled { background: var(–gray); cursor: not-allowed; }
+.btn-clear {
+background: transparent; color: var(–gray);
+border: 1.5px solid var(–light);
+padding: 12px 20px; font-size: 13px; border-radius: 10px;
+}
+.btn-clear:hover { border-color: var(–red); color: var(–red); }
+
+/* MANUAL INPUT */
+.manual-section {
+padding: 0 20px 20px;
+border-top: 1px solid var(–light);
+padding-top: 16px;
+}
+.manual-label {
+font-size: 11px; font-weight: 700; color: var(–gray);
+letter-spacing: 0.1em; text-transform: uppercase;
+margin-bottom: 10px;
+}
+.manual-row { display: flex; gap: 8px; }
+input[type=“text”] {
+flex: 1;
+font-family: ‘JetBrains Mono’, monospace;
+font-size: 15px; font-weight: 700;
+padding: 10px 14px;
+border: 2px solid var(–light);
+border-radius: 8px;
+background: var(–cream);
+color: var(–ink);
+outline: none;
+letter-spacing: 0.1em;
+transition: border-color 0.15s;
+}
+input[type=“text”]:focus { border-color: var(–red); }
+input[type=“text”]::placeholder { color: var(–gray); font-weight: 400; letter-spacing: 0; }
+
+/* FLASH */
+.flash {
+padding: 10px 20px;
+font-size: 13px; font-weight: 700;
+display: none; align-items: center; gap: 8px;
+animation: fadeout 2.5s forwards;
+}
+.flash.show { display: flex; }
+.flash.success { background: #E8F5E9; color: #2E7D32; }
+.flash.error { background: #FFEBEE; color: #C62828; }
+.flash.warn { background: #FFF8E1; color: #F57F17; }
+@keyframes fadeout {
+0% { opacity: 1; }
+70% { opacity: 1; }
+100% { opacity: 0; }
+}
+
+/* LIST SECTION */
+.list-card {
+background: white;
+border-radius: 16px;
+box-shadow: var(–shadow);
+overflow: hidden;
+margin-bottom: 20px;
+}
+.list-stats {
+padding: 14px 20px;
+background: var(–cream);
+border-bottom: 1px solid var(–light);
+display: flex; align-items: center; justify-content: space-between;
+font-size: 13px;
+}
+.count-badge {
+background: var(–red);
+color: white;
+font-weight: 900; font-size: 22px;
+padding: 2px 12px;
+border-radius: 6px;
+font-family: ‘JetBrains Mono’, monospace;
+}
+.list-empty {
+padding: 40px 20px;
+text-align: center;
+color: var(–gray);
+font-size: 14px;
+line-height: 1.8;
+}
+.list-empty .empty-icon { font-size: 36px; margin-bottom: 10px; }
+
+/* TABLE */
+.tracking-table { width: 100%; border-collapse: collapse; }
+.tracking-table th {
+background: var(–light);
+font-size: 10px; font-weight: 700;
+letter-spacing: 0.1em; text-transform: uppercase;
+padding: 10px 16px; text-align: left;
+color: var(–gray);
+}
+.tracking-table td {
+padding: 12px 16px;
+border-bottom: 1px solid var(–light);
+font-size: 13px; vertical-align: middle;
+}
+.tracking-table tr:last-child td { border-bottom: none; }
+.tracking-table tr:hover td { background: var(–cream); }
+.num-cell {
+font-family: ‘JetBrains Mono’, monospace;
+font-weight: 700; font-size: 14px;
+letter-spacing: 0.08em; color: var(–ink);
+}
+.num-idx {
+font-size: 11px; font-weight: 700; color: var(–gray);
+font-family: ‘JetBrains Mono’, monospace;
+}
+.url-cell a {
+color: var(–blue); font-size: 11px;
+text-decoration: none; word-break: break-all;
+font-family: ‘JetBrains Mono’, monospace;
+}
+.url-cell a:hover { color: var(–red); text-decoration: underline; }
+.del-btn {
+background: none; border: none; cursor: pointer;
+color: var(–gray); font-size: 16px; padding: 4px 8px;
+border-radius: 4px; transition: all 0.1s;
+line-height: 1;
+}
+.del-btn:hover { background: #FFEBEE; color: var(–red); }
+.type-badge {
+font-size: 10px; font-weight: 700; letter-spacing: 0.06em;
+padding: 2px 7px; border-radius: 4px;
+display: inline-block; margin-top: 3px;
+}
+.type-plus { background: #FFF3E0; color: #E65100; }
+.type-light { background: #E3F2FD; color: #0D47A1; }
+.type-unknown { background: var(–light); color: var(–gray); }
+
+/* EXPORT BAR */
+.export-bar {
+background: white;
+border-radius: 16px;
+box-shadow: var(–shadow);
+padding: 20px;
+display: flex; gap: 12px; align-items: flex-start; flex-wrap: wrap;
+flex-direction: column;
+}
+.export-bar .hint {
+font-size: 12px; color: var(–gray);
+}
+.export-filename-row {
+display: flex; gap: 8px; align-items: center; width: 100%; flex-wrap: wrap;
+}
+.export-filename-row label {
+font-size: 11px; font-weight: 700; color: var(–gray);
+letter-spacing: 0.1em; text-transform: uppercase;
+white-space: nowrap;
+}
+.export-filename-row input {
+flex: 1; min-width: 180px;
+font-family: ‘JetBrains Mono’, monospace;
+font-size: 13px; font-weight: 700;
+padding: 8px 12px;
+border: 2px solid var(–light);
+border-radius: 8px;
+background: var(–cream);
+color: var(–ink);
+outline: none;
+transition: border-color 0.15s;
+}
+.export-filename-row input:focus { border-color: var(–blue); }
+.export-filename-row .ext {
+font-size: 13px; font-weight: 700; color: var(–gray);
+font-family: ‘JetBrains Mono’, monospace;
+}
+.export-btn-row {
+display: flex; gap: 10px; align-items: center; width: 100%; flex-wrap: wrap;
+}
+.browser-note {
+font-size: 11px; color: var(–gray);
+background: var(–light); border-radius: 6px;
+padding: 4px 10px; display: inline-block;
+}
+
+/* TOAST */
+#toast {
+position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+background: var(–ink); color: white;
+padding: 12px 24px; border-radius: 24px;
+font-size: 13px; font-weight: 700;
+box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+opacity: 0; transition: opacity 0.3s; pointer-events: none;
+white-space: nowrap; z-index: 100;
+}
+#toast.show { opacity: 1; }
+</style>
+
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <div class="logo-mark">📦</div>
+    <div class="header-text">
+      <h1>レターパック 追跡番号スキャナー</h1>
+      <p>Letterpack Tracking Number Scanner &amp; Exporter</p>
+    </div>
+  </div>
+  <div class="badge-row">
+    <span class="badge">📷 バーコードスキャン</span>
+    <span class="badge blue">📊 Excel出力</span>
+    <span class="badge">🔗 追跡URL自動生成</span>
+  </div>
+</header>
+
+<main>
+
+  <!-- SCAN CARD -->
+
+  <div class="scan-card">
+    <div class="card-header">
+      <span class="icon">📷</span> バーコードスキャン / 手動入力
+    </div>
+
+```
+<div id="camera-section">
+  <div id="video-container">
+    <video id="video" autoplay playsinline muted></video>
+    <div class="scan-overlay">
+      <div class="scan-frame">
+        <div class="scan-line"></div>
+        <div class="corner tl"></div>
+        <div class="corner tr"></div>
+        <div class="corner bl"></div>
+        <div class="corner br"></div>
+      </div>
+    </div>
+  </div>
+  <p class="camera-label" id="camera-hint">バーコードをスキャン枠に合わせてください</p>
+  <div class="btn-row">
+    <button class="btn btn-primary" id="startBtn" onclick="startCamera()">📷 カメラを起動</button>
+    <button class="btn btn-stop" id="stopBtn" onclick="stopCamera()" style="display:none">⏹ 停止</button>
+  </div>
+</div>
+
+<div id="flash" class="flash"></div>
+
+<div class="manual-section">
+  <div class="manual-label">✏ 追跡番号を手入力</div>
+  <div class="manual-row">
+    <input type="text" id="manualInput" placeholder="例: 0123-4567-8901" maxlength="20"
+      onkeydown="if(event.key==='Enter') addManual()">
+    <button class="btn btn-primary" onclick="addManual()">追加</button>
+  </div>
+</div>
+```
+
+  </div>
+
+  <!-- LIST CARD -->
+
+  <div class="list-card">
+    <div class="card-header">
+      <span class="icon">📋</span> 登録済み追跡番号
+    </div>
+    <div class="list-stats">
+      <div>
+        <span class="count-badge" id="countBadge">0</span>
+        <span style="font-size:13px; margin-left:10px; color:var(--gray);">件登録済み</span>
+      </div>
+    </div>
+    <div id="listBody">
+      <div class="list-empty">
+        <div class="empty-icon">📭</div>
+        <div>まだ追跡番号が登録されていません</div>
+        <div style="font-size:12px; margin-top:6px;">バーコードをスキャンするか、手入力してください</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- EXPORT BAR -->
+
+  <div class="export-bar">
+    <div class="hint">A・B列（部屋番号・宛先）は空欄で出力されます。Excelで直接入力してください。</div>
+    <div class="export-filename-row">
+      <label>ファイル名</label>
+      <input type="text" id="filenameInput" placeholder="letterpack_20260405" maxlength="80">
+      <span class="ext">.xlsx</span>
+    </div>
+    <div class="export-btn-row">
+      <button class="btn btn-clear" onclick="clearAll()">🗑 全件削除</button>
+      <button class="btn btn-export" id="exportBtn" onclick="exportXlsx()" disabled>
+        📊 Excelでダウンロード
+      </button>
+      <span class="browser-note" id="browserNote"></span>
+    </div>
+  </div>
+
+</main>
+
+<div id="toast"></div>
+
+<!-- ZXing for barcode detection -->
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/zxing-js/0.19.2/umd/index.min.js"></script>
+
+<script>
+// ---- STATE ----
+let trackingList = [];
+let codeReader = null;
+let scanning = false;
+
+// ---- TRACKING URL ----
+function makeUrl(num) {
+  const clean = num.replace(/-/g, '');
+  return `https://trackings.post.japanpost.jp/services/srv/search/direct?reqCodeNo1=${clean}&searchKind=S002&locale=ja`;
+}
+
+// ---- TYPE DETECTION ----
+function detectType(num) {
+  const clean = num.replace(/-/g, '');
+  if (clean.startsWith('31') || clean.startsWith('32')) return 'plus';
+  if (clean.startsWith('33') || clean.startsWith('34')) return 'light';
+  return 'unknown';
+}
+
+// ---- NORMALIZE ----
+function normalize(raw) {
+  const digits = raw.replace(/\D/g, '');
+  if (digits.length !== 12) return null;
+  return digits.replace(/^(\d{4})(\d{4})(\d{4})$/, '$1-$2-$3');
+}
+
+// ---- ADD ----
+function addTracking(raw, fromCamera = false) {
+  const num = normalize(raw);
+  if (!num) {
+    showFlash(`⚠ 12桁の追跡番号ではありません: "${raw}"`, 'warn');
+    return false;
+  }
+  if (trackingList.find(t => t.num === num)) {
+    showFlash(`⚠ すでに登録済みです: ${num}`, 'warn');
+    return false;
+  }
+  trackingList.push({ num, url: makeUrl(num), type: detectType(num) });
+  renderList();
+  showFlash(`✓ 追加しました: ${num}`, 'success');
+  if (fromCamera) showToast(`📦 ${num}`);
+  return true;
+}
+
+function addManual() {
+  const val = document.getElementById('manualInput').value.trim();
+  if (!val) return;
+  addTracking(val);
+  document.getElementById('manualInput').value = '';
+}
+
+// ---- DELETE ----
+function deleteItem(idx) {
+  trackingList.splice(idx, 1);
+  renderList();
+}
+
+function clearAll() {
+  if (trackingList.length === 0) return;
+  if (!confirm(`${trackingList.length}件すべて削除しますか？`)) return;
+  trackingList = [];
+  renderList();
+}
+
+// ---- RENDER ----
+function renderList() {
+  const el = document.getElementById('listBody');
+  const count = trackingList.length;
+  document.getElementById('countBadge').textContent = count;
+  document.getElementById('exportBtn').disabled = count === 0;
+
+  if (count === 0) {
+    el.innerHTML = `<div class="list-empty">
+      <div class="empty-icon">📭</div>
+      <div>まだ追跡番号が登録されていません</div>
+      <div style="font-size:12px; margin-top:6px;">バーコードをスキャンするか、手入力してください</div>
+    </div>`;
+    return;
+  }
+
+  const typeLabel = { plus: 'プラス', light: 'ライト', unknown: '不明' };
+  const typeClass = { plus: 'type-plus', light: 'type-light', unknown: 'type-unknown' };
+
+  const rows = trackingList.map((t, i) => `
+    <tr>
+      <td><span class="num-idx">${String(i+1).padStart(2,'0')}</span></td>
+      <td>
+        <div class="num-cell">${t.num}</div>
+        <span class="type-badge ${typeClass[t.type]}">${typeLabel[t.type]}</span>
+      </td>
+      <td class="url-cell"><a href="${t.url}" target="_blank" rel="noopener">${t.url}</a></td>
+      <td><button class="del-btn" onclick="deleteItem(${i})" title="削除">✕</button></td>
+    </tr>
+  `).join('');
+
+  el.innerHTML = `<table class="tracking-table">
+    <thead><tr>
+      <th>#</th>
+      <th>追跡番号</th>
+      <th>追跡URL</th>
+      <th></th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+// ---- FLASH ----
+function showFlash(msg, type) {
+  const el = document.getElementById('flash');
+  el.className = `flash show ${type}`;
+  el.textContent = msg;
+  el.style.animation = 'none';
+  requestAnimationFrame(() => {
+    el.style.animation = 'fadeout 2.5s forwards';
+  });
+  setTimeout(() => { el.className = 'flash'; }, 2600);
+}
+
+// ---- TOAST ----
+let toastTimer;
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2000);
+}
+
+// ---- CAMERA ----
+async function startCamera() {
+  try {
+    if (typeof ZXing === 'undefined') {
+      showFlash('❌ バーコードライブラリの読み込みに失敗しました', 'error');
+      return;
+    }
+    const hints = new Map();
+    const formats = [ZXing.BarcodeFormat.CODE_128, ZXing.BarcodeFormat.EAN_13, ZXing.BarcodeFormat.CODE_39];
+    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
+    codeReader = new ZXing.BrowserMultiFormatReader(hints);
+
+    const vc = document.getElementById('video-container');
+    vc.classList.add('active');
+    document.getElementById('startBtn').style.display = 'none';
+    document.getElementById('stopBtn').style.display = 'inline-flex';
+    document.getElementById('camera-hint').textContent = 'バーコードをスキャン枠に合わせてください';
+    scanning = true;
+
+    await codeReader.decodeFromVideoDevice(null, 'video', (result, err) => {
+      if (result && scanning) {
+        const text = result.getText();
+        const added = addTracking(text, true);
+        if (added) {
+          // brief pause to avoid duplicates
+          scanning = false;
+          setTimeout(() => { scanning = true; }, 2000);
+        }
+      }
+    });
+  } catch(e) {
+    showFlash('❌ カメラを起動できませんでした: ' + e.message, 'error');
+    stopCamera();
+  }
+}
+
+function stopCamera() {
+  scanning = false;
+  if (codeReader) {
+    codeReader.reset();
+    codeReader = null;
+  }
+  document.getElementById('video-container').classList.remove('active');
+  document.getElementById('startBtn').style.display = 'inline-flex';
+  document.getElementById('stopBtn').style.display = 'none';
+  document.getElementById('camera-hint').textContent = 'バーコードをスキャン枠に合わせてください';
+}
+
+// ---- FILENAME DEFAULT ----
+function defaultFilename() {
+  const d = new Date();
+  const stamp = `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
+  return `letterpack_${stamp}`;
+}
+
+// ---- BROWSER CHECK ----
+const supportsFilePicker = typeof window.showSaveFilePicker === 'function';
+window.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('filenameInput').value = defaultFilename();
+  const note = document.getElementById('browserNote');
+  if (supportsFilePicker) {
+    note.textContent = '📂 保存場所も選択できます（Chrome/Edge）';
+    note.style.color = '#2E7D32';
+    note.style.background = '#E8F5E9';
+  } else {
+    note.textContent = '💡 Chrome/Edgeでは保存場所も選択可能です';
+  }
+});
+
+// ---- BUILD WORKBOOK ----
+function buildWorkbook() {
+  const wb = XLSX.utils.book_new();
+  const data = [['部屋番号', '宛先', '追跡番号', '追跡URL']];
+  trackingList.forEach(t => data.push(['', '', t.num, t.url]));
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  ws['!cols'] = [{ wch: 12 }, { wch: 20 }, { wch: 18 }, { wch: 90 }];
+  XLSX.utils.book_append_sheet(wb, ws, '追跡番号一覧');
+  return wb;
+}
+
+// ---- EXPORT ----
+async function exportXlsx() {
+  if (trackingList.length === 0) return;
+
+  const nameInput = document.getElementById('filenameInput').value.trim();
+  const filename = (nameInput || defaultFilename()) + '.xlsx';
+  const wb = buildWorkbook();
+
+  if (supportsFilePicker) {
+    try {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: filename,
+        types: [{
+          description: 'Excel ファイル',
+          accept: { 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'] }
+        }]
+      });
+      const wbArrayBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+      const writable = await handle.createWritable();
+      await writable.write(new Blob([wbArrayBuffer], { type: 'application/octet-stream' }));
+      await writable.close();
+      showToast(`📊 "${handle.name}" を保存しました`);
+      return;
+    } catch(e) {
+      if (e.name === 'AbortError') return; // ユーザーがキャンセル
+      // fallback to normal download
+    }
+  }
+
+  // Fallback: 通常ダウンロード
+  XLSX.writeFile(wb, filename);
+  showToast(`📊 "${filename}" をダウンロードしました`);
+}
+</script>
+
+</body>
+</html>
