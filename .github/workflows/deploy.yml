@@ -9,7 +9,13 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
       - name: リポジトリをチェックアウト
@@ -19,9 +25,14 @@ jobs:
         run: |
           sed -i "s|__GOOGLE_BOOKS_API_KEY__|${{ secrets.GOOGLE_BOOKS_API_KEY }}|g" index.html
 
-      - name: GitHub Pagesにデプロイ
-        uses: peaceiris/actions-gh-pages@v3
+      - name: GitHub Pages設定
+        uses: actions/configure-pages@v4
+
+      - name: アーティファクトをアップロード
+        uses: actions/upload-pages-artifact@v3
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./
-          publish_branch: gh-pages
+          path: ./
+
+      - name: GitHub Pagesにデプロイ
+        id: deployment
+        uses: actions/deploy-pages@v4
