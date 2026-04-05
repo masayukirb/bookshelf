@@ -1,0 +1,27 @@
+name: Deploy BookShelf
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: リポジトリをチェックアウト
+        uses: actions/checkout@v4
+
+      - name: APIキーを埋め込む
+        run: |
+          sed -i "s|__GOOGLE_BOOKS_API_KEY__|${{ secrets.GOOGLE_BOOKS_API_KEY }}|g" index.html
+
+      - name: GitHub Pagesにデプロイ
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./
+          publish_branch: gh-pages
