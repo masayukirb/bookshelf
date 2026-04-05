@@ -1087,7 +1087,8 @@
   <footer>BOOKSHELF PROTOTYPE · PDF.js · Google Books API · OneDrive（Microsoft Graph API）· IndexedDB永続保存</footer>
 </div>
 
-<!-- ZXing不要・ネイティブBarcodeDetector使用 -->
+<!-- QuaggaJS バーコードライブラリ -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
 
 <script type="module">
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
@@ -1348,7 +1349,7 @@
   const scanStartBtn    = document.getElementById('scanStartBtn');
   const scanStopBtn     = document.getElementById('scanStopBtn');
   const scanViewport    = document.getElementById('scanViewport');
-  const scanVideo       = document.getElementById('scanVideo');
+  const scanVideoEl     = document.getElementById('scanVideo');
   const scanIsbnInput   = document.getElementById('scanIsbnInput');
   const scanIsbnFetch   = document.getElementById('scanIsbnFetch');
   const scanResult      = document.getElementById('scanResult');
@@ -1407,56 +1408,65 @@
     stopCamera();
   }
 
-  // カメラ起動（ネイティブBarcodeDetector使用）
+  // カメラ起動（QuaggaJS使用）
   scanStartBtn.addEventListener('click', async () => {
-    if (!('BarcodeDetector' in window)) {
-      alert('このブラウザはバーコードスキャンに対応していません。\nISBNを手入力してください。');
+    if (!window.Quagga) {
+      alert('バーコードライブラリの読み込みに失敗しました。ページを再読込してください。');
       return;
     }
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' }
-      });
-      scanVideo.srcObject = stream;
-      await scanVideo.play();
       scanViewport.style.display = 'block';
       scanStartBtn.style.display = 'none';
       scanStopBtn.style.display = 'inline-block';
 
-      const detector = new BarcodeDetector({ formats: ['ean_13', 'ean_8'] });
+      Quagga.init({
+        inputStream: {
+          name: 'Live',
+          type: 'LiveStream',
+          target: scanVideoEl,
+          constraints: { facingMode: 'environment' }
+        },
+        decoder: { readers: ['ean_reader'] },
+        locate: true,
+      }, err => {
+        if (err) {
+          console.error('Quagga init error:', err);
+          stopCamera();
+          alert('カメラを起動できませんでした。\nブラウザの設定でカメラの許可を確認してください。');
+          return;
+        }
+        Quagga.start();
+      });
 
-      const detect = async () => {
-        if (!scanVideo.srcObject) return;
-        try {
-          const barcodes = await detector.detect(scanVideo);
-          if (barcodes.length > 0) {
-            const isbn = barcodes[0].rawValue.replace(/[^0-9X]/g, '');
-            if (isbn.length === 13 || isbn.length === 10) {
-              stopCamera();
-              scanIsbnInput.value = isbn;
-              await fetchAndShowISBN(isbn);
-              return;
-            }
-          }
-        } catch(e) {}
-        scanAnimFrame = requestAnimationFrame(detect);
-      };
-      scanAnimFrame = requestAnimationFrame(detect);
+      Quagga.onDetected(async result => {
+        const isbn = (result.codeResult.code || '').replace(/[^0-9X]/g, '');
+        if (isbn.length === 13 || isbn.length === 10) {
+          stopCamera();
+          scanIsbnInput.value = isbn;
+          await fetchAndShowISBN(isbn);
+        }
+      });
 
     } catch(e) {
       console.error('カメラエラー:', e);
+      stopCamera();
       alert('カメラを起動できませんでした。\nブラウザの設定でカメラの許可を確認してください。');
     }
   });
 
   function stopCamera() {
+    if (window.Quagga) {
+      try { Quagga.stop(); } catch(e) {}
+    }
     if (scanAnimFrame) {
       cancelAnimationFrame(scanAnimFrame);
       scanAnimFrame = null;
     }
-    if (scanVideo.srcObject) {
-      scanVideo.srcObject.getTracks().forEach(t => t.stop());
-      scanVideo.srcObject = null;
+    // Quaggaが管理するvideoを停止
+    const v = scanVideoEl.querySelector('video');
+    if (v && v.srcObject) {
+      v.srcObject.getTracks().forEach(t => t.stop());
+      v.srcObject = null;
     }
     scanViewport.style.display = 'none';
     scanStartBtn.style.display = 'inline-block';
@@ -2515,8 +2525,8 @@
       <div class="edit-field">
         <label class="edit-label">バーコードをカメラでスキャン</label>
         <div id="scanViewport" style="position:relative;width:100%;max-width:360px;margin:0 auto;display:none;">
-          <video id="scanVideo" style="width:100%;border:2px solid var(--rule);" autoplay playsinline muted></video>
-          <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:80%;height:2px;background:var(--accent);opacity:0.7;"></div>
+          <div id="scanVideo" style="width:100%;border:2px solid var(--rule);overflow:hidden;"></div>
+          <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:80%;height:2px;background:var(--accent);opacity:0.7;pointer-events:none;"></div>
         </div>
         <div style="display:flex;gap:8px;margin-top:8px;">
           <button class="isbn-fetch-btn" id="scanStartBtn" style="padding:8px 16px;font-size:13px;">カメラを起動</button>
