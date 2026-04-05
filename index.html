@@ -1087,8 +1087,7 @@
   <footer>BOOKSHELF PROTOTYPE · PDF.js · Google Books API · OneDrive（Microsoft Graph API）· IndexedDB永続保存</footer>
 </div>
 
-<!-- ZXing バーコードライブラリ -->
-<script src="https://unpkg.com/@zxing/browser@0.1.5/umd/index.min.js"></script>
+<!-- ZXing不要・ネイティブBarcodeDetector使用 -->
 
 <script type="module">
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
@@ -1361,7 +1360,7 @@
   const scanModalSave   = document.getElementById('scanModalSave');
   const scanBtn         = document.getElementById('scanBtn');
 
-  let codeReader = null;
+  let scanAnimFrame = null;
   let scanPendingBook = null;
 
   function showScanResult(info, isbn) {
@@ -1409,29 +1408,44 @@
   }
 
   // カメラ起動
+  // カメラ起動（ネイティブBarcodeDetector使用）
+  let scanAnimFrame = null;
+
   scanStartBtn.addEventListener('click', async () => {
-    const ZXing = window.ZXingBrowser || window.ZXing;
-    if (!ZXing || !ZXing.BrowserMultiFormatReader) {
-      alert('バーコードライブラリの読み込みに失敗しました。ページを再読込してください。');
+    if (!('BarcodeDetector' in window)) {
+      alert('このブラウザはバーコードスキャンに対応していません。\nISBNを手入力してください。');
       return;
     }
     try {
-      codeReader = new ZXing.BrowserMultiFormatReader();
-      const devices = await ZXing.BrowserMultiFormatReader.listVideoInputDevices();
-      const deviceId = devices.length > 0 ? devices[devices.length - 1].deviceId : undefined;
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' }
+      });
+      scanVideo.srcObject = stream;
+      await scanVideo.play();
       scanViewport.style.display = 'block';
       scanStartBtn.style.display = 'none';
       scanStopBtn.style.display = 'inline-block';
-      codeReader.decodeFromVideoDevice(deviceId, scanVideo, async (result, err) => {
-        if (result) {
-          const isbn = result.getText().replace(/[^0-9X]/g, '');
-          if (isbn.length === 13 || isbn.length === 10) {
-            stopCamera();
-            scanIsbnInput.value = isbn;
-            await fetchAndShowISBN(isbn);
+
+      const detector = new BarcodeDetector({ formats: ['ean_13', 'ean_8'] });
+
+      const detect = async () => {
+        if (!scanVideo.srcObject) return;
+        try {
+          const barcodes = await detector.detect(scanVideo);
+          if (barcodes.length > 0) {
+            const isbn = barcodes[0].rawValue.replace(/[^0-9X]/g, '');
+            if (isbn.length === 13 || isbn.length === 10) {
+              stopCamera();
+              scanIsbnInput.value = isbn;
+              await fetchAndShowISBN(isbn);
+              return;
+            }
           }
-        }
-      });
+        } catch(e) {}
+        scanAnimFrame = requestAnimationFrame(detect);
+      };
+      scanAnimFrame = requestAnimationFrame(detect);
+
     } catch(e) {
       console.error('カメラエラー:', e);
       alert('カメラを起動できませんでした。\nブラウザの設定でカメラの許可を確認してください。');
@@ -1439,17 +1453,17 @@
   });
 
   function stopCamera() {
-    if (codeReader) {
-      codeReader.reset();
-      codeReader = null;
+    if (scanAnimFrame) {
+      cancelAnimationFrame(scanAnimFrame);
+      scanAnimFrame = null;
     }
-    scanViewport.style.display = 'none';
-    scanStartBtn.style.display = 'inline-block';
-    scanStopBtn.style.display = 'none';
     if (scanVideo.srcObject) {
       scanVideo.srcObject.getTracks().forEach(t => t.stop());
       scanVideo.srcObject = null;
     }
+    scanViewport.style.display = 'none';
+    scanStartBtn.style.display = 'inline-block';
+    scanStopBtn.style.display = 'none';
   }
 
   scanStopBtn.addEventListener('click', stopCamera);
