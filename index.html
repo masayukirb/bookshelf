@@ -1407,10 +1407,7 @@
     stopCamera();
   }
 
-  // カメラ起動
   // カメラ起動（ネイティブBarcodeDetector使用）
-  let scanAnimFrame = null;
-
   scanStartBtn.addEventListener('click', async () => {
     if (!('BarcodeDetector' in window)) {
       alert('このブラウザはバーコードスキャンに対応していません。\nISBNを手入力してください。');
