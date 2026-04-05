@@ -161,8 +161,17 @@
         <button class="btn btn-stop" id="stopBtn" onclick="stopCamera()" style="display:none">⏹ 停止</button>
       </div>
     </div>
-    <div id="detector-warning">
-      ⚠ このブラウザはカメラによるバーコード読み取りに対応していません（Chrome 88以降、またはSafari 17以降を推奨）。下の手入力欄をご利用ください。
+    <div id="photo-fallback" style="display:none; padding:0 18px 18px;">
+      <div style="font-size:12px; color:var(--gray); margin-bottom:10px; background:var(--cream); border-radius:8px; padding:10px 12px;">
+        📱 お使いのブラウザはリアルタイムスキャン非対応です。写真を撮って読み取ることができます。
+      </div>
+      <div class="btn-row" style="justify-content:flex-start; gap:10px;">
+        <button class="btn btn-primary" onclick="triggerPhotoCapture()">📸 写真を撮って読み取る</button>
+        <input type="file" id="photoInput" accept="image/*" capture="environment" style="display:none" onchange="handlePhoto(this)">
+        <button class="btn" style="background:var(--light);color:var(--ink);" onclick="triggerPhotoGallery()">🖼 画像を選ぶ</button>
+        <input type="file" id="galleryInput" accept="image/*" style="display:none" onchange="handlePhoto(this)">
+      </div>
+      <canvas id="photoCanvas" style="display:none;"></canvas>
     </div>
     <div id="flash"></div>
     <div class="manual-section">
@@ -293,16 +302,14 @@ function showToast(msg) {
   toastTimer = setTimeout(function(){ el.classList.remove('show'); }, 2200);
 }
 
-/* --- CAMERA (BarcodeDetector API) --- */
+/* --- CAMERA --- */
 var hasBarcodeDetector = (typeof BarcodeDetector !== 'undefined');
 
 function checkBarcodeSupport() {
   if (!hasBarcodeDetector) {
-    document.getElementById('detector-warning').classList.add('show');
-    var btn = document.getElementById('startBtn');
-    btn.disabled = true;
-    btn.style.opacity = '0.4';
-    btn.style.cursor = 'not-allowed';
+    // リアルタイムスキャンボタンを隠して写真フォールバックを表示
+    document.getElementById('camera-section').style.display = 'none';
+    document.getElementById('photo-fallback').style.display = 'block';
   }
 }
 
@@ -343,6 +350,65 @@ function stopCamera() {
   document.getElementById('video-container').classList.remove('active');
   document.getElementById('startBtn').style.display = 'inline-flex';
   document.getElementById('stopBtn').style.display = 'none';
+}
+
+/* --- 写真フォールバック --- */
+function triggerPhotoCapture() {
+  document.getElementById('photoInput').value = '';
+  document.getElementById('photoInput').click();
+}
+function triggerPhotoGallery() {
+  document.getElementById('galleryInput').value = '';
+  document.getElementById('galleryInput').click();
+}
+
+function handlePhoto(input) {
+  var file = input.files && input.files[0];
+  if (!file) return;
+  var img = new Image();
+  var url = URL.createObjectURL(file);
+  img.onload = function() {
+    var canvas = document.getElementById('photoCanvas');
+    canvas.width  = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+    var ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0);
+    URL.revokeObjectURL(url);
+
+    if (typeof BarcodeDetector !== 'undefined') {
+      // BarcodeDetectorが使える場合はcanvasから検出
+      var detector = new BarcodeDetector({ formats: ['code_128','ean_13','ean_8','code_39'] });
+      detector.detect(canvas).then(function(barcodes) {
+        if (barcodes.length === 0) {
+          showFlash('バーコードを検出できませんでした。明るい場所で再度お試しください。', 'warn');
+        } else {
+          barcodes.forEach(function(b) { addTracking(b.rawValue, true); });
+        }
+      }).catch(function(e) {
+        showFlash('読み取りエラー: ' + e.message, 'error');
+      });
+    } else {
+      // BarcodeDetectorなし: 画像内の数字列をOCR的に探す（簡易）
+      decodeFromCanvas(canvas);
+    }
+  };
+  img.onerror = function() { showFlash('画像を読み込めませんでした', 'error'); };
+  img.src = url;
+}
+
+// BarcodeDetectorもない極端な旧環境向け: ピクセル解析は困難なので
+// 代わりにユーザーへ手入力を促しつつ画像プレビューを表示
+function decodeFromCanvas(canvas) {
+  showFlash('このブラウザでは画像からの自動読み取りができません。追跡番号を手入力してください。', 'warn');
+  // 小さなプレビューを表示して番号確認を助ける
+  var preview = document.createElement('img');
+  preview.src = canvas.toDataURL('image/jpeg', 0.7);
+  preview.style.cssText = 'max-width:100%;border-radius:6px;margin-top:10px;display:block;';
+  var fb = document.getElementById('photo-fallback');
+  var old = fb.querySelector('.photo-preview');
+  if (old) old.remove();
+  preview.className = 'photo-preview';
+  fb.appendChild(preview);
 }
 
 /* --- XLSX builder (CDN不要・純粋JS) --- */
