@@ -5,381 +5,123 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>レターパック追跡番号スキャナー</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js"></script>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;700;900&family=JetBrains+Mono:wght@400;700&display=swap');
-
-:root {
-–red: #C8002D;
-–red-dark: #8C001F;
-–red-light: #FF1A4A;
-–blue: #003087;
-–blue-light: #1A4FBF;
-–cream: #FAF7F2;
-–ink: #1A1410;
-–gray: #8A8580;
-–light: #EDEAE4;
-–white: #FFFFFF;
-–shadow: 0 4px 24px rgba(0,0,0,0.12);
-}
-
-- { box-sizing: border-box; margin: 0; padding: 0; }
-
-body {
-font-family: ‘Zen Kaku Gothic New’, sans-serif;
-background: var(–cream);
-color: var(–ink);
-min-height: 100vh;
-}
-
-/* HEADER */
-header {
-background: var(–red);
-color: white;
-padding: 0;
-position: relative;
-overflow: hidden;
-}
-header::before {
-content: ‘’;
-position: absolute;
-top: -30px; right: -30px;
-width: 180px; height: 180px;
-background: var(–red-dark);
-border-radius: 50%;
-opacity: 0.5;
-}
-header::after {
-content: ‘’;
-position: absolute;
-bottom: -20px; left: 40%;
-width: 120px; height: 120px;
-background: var(–red-light);
-border-radius: 50%;
-opacity: 0.2;
-}
-.header-inner {
-padding: 28px 32px 24px;
-position: relative; z-index: 1;
-display: flex; align-items: flex-end; gap: 16px;
-}
-.logo-mark {
-font-size: 36px; line-height: 1;
-}
-.header-text h1 {
-font-size: 22px; font-weight: 900; letter-spacing: 0.05em;
-line-height: 1.1;
-}
-.header-text p {
-font-size: 11px; opacity: 0.8; margin-top: 4px;
-letter-spacing: 0.1em; text-transform: uppercase;
-}
-.badge-row {
-padding: 0 32px 20px;
-position: relative; z-index: 1;
-display: flex; gap: 8px;
-}
-.badge {
-background: rgba(255,255,255,0.15);
-border: 1px solid rgba(255,255,255,0.3);
-color: white;
-font-size: 11px; font-weight: 700;
-padding: 4px 10px; border-radius: 20px;
-letter-spacing: 0.08em;
-}
-.badge.blue { background: var(–blue); border-color: var(–blue-light); }
-
-/* MAIN */
-main { max-width: 720px; margin: 0 auto; padding: 28px 20px 60px; }
-
-/* SCAN SECTION */
-.scan-card {
-background: white;
-border-radius: 16px;
-box-shadow: var(–shadow);
-overflow: hidden;
-margin-bottom: 20px;
-}
-.card-header {
-background: var(–ink);
-color: white;
-padding: 14px 20px;
-display: flex; align-items: center; gap: 10px;
-font-weight: 700; font-size: 14px; letter-spacing: 0.05em;
-}
-.card-header .icon { font-size: 18px; }
-
-/* CAMERA */
-#camera-section { padding: 20px; }
-#video-container {
-position: relative;
-background: #000;
-border-radius: 10px;
-overflow: hidden;
-aspect-ratio: 16/9;
-display: none;
-margin-bottom: 12px;
-}
-#video-container.active { display: block; }
-video { width: 100%; height: 100%; object-fit: cover; display: block; }
-.scan-overlay {
-position: absolute; inset: 0;
-display: flex; align-items: center; justify-content: center;
-pointer-events: none;
-}
-.scan-frame {
-width: 80%; max-width: 380px;
-height: 80px;
-border: 2px solid var(–red);
-border-radius: 6px;
-position: relative;
-}
-.scan-line {
-position: absolute;
-left: 4px; right: 4px;
-height: 2px;
-background: var(–red);
-animation: scanline 2s ease-in-out infinite;
-box-shadow: 0 0 8px var(–red);
-}
-@keyframes scanline {
-0% { top: 10%; }
-50% { top: 85%; }
-100% { top: 10%; }
-}
-.corner {
-position: absolute;
-width: 14px; height: 14px;
-border-color: white;
-border-style: solid;
-}
-.corner.tl { top: -2px; left: -2px; border-width: 3px 0 0 3px; }
-.corner.tr { top: -2px; right: -2px; border-width: 3px 3px 0 0; }
-.corner.bl { bottom: -2px; left: -2px; border-width: 0 0 3px 3px; }
-.corner.br { bottom: -2px; right: -2px; border-width: 0 3px 3px 0; }
-
-.camera-label {
-text-align: center;
-font-size: 12px;
-color: var(–gray);
-margin-bottom: 14px;
-letter-spacing: 0.05em;
-}
-.btn-row { display: flex; gap: 10px; justify-content: center; }
-
-/* BUTTONS */
-.btn {
-display: inline-flex; align-items: center; gap: 6px;
-padding: 10px 20px; border-radius: 8px;
-font-family: inherit; font-weight: 700; font-size: 13px;
-cursor: pointer; border: none; transition: all 0.15s;
-letter-spacing: 0.04em;
-}
-.btn-primary {
-background: var(–red); color: white;
-}
-.btn-primary:hover { background: var(–red-dark); }
-.btn-stop {
-background: var(–ink); color: white;
-}
-.btn-stop:hover { background: #333; }
-.btn-export {
-background: var(–blue); color: white;
-padding: 12px 28px; font-size: 14px; border-radius: 10px;
-}
-.btn-export:hover { background: var(–blue-light); }
-.btn-export:disabled { background: var(–gray); cursor: not-allowed; }
-.btn-clear {
-background: transparent; color: var(–gray);
-border: 1.5px solid var(–light);
-padding: 12px 20px; font-size: 13px; border-radius: 10px;
-}
-.btn-clear:hover { border-color: var(–red); color: var(–red); }
-
-/* MANUAL INPUT */
-.manual-section {
-padding: 0 20px 20px;
-border-top: 1px solid var(–light);
-padding-top: 16px;
-}
-.manual-label {
-font-size: 11px; font-weight: 700; color: var(–gray);
-letter-spacing: 0.1em; text-transform: uppercase;
-margin-bottom: 10px;
-}
-.manual-row { display: flex; gap: 8px; }
-input[type=“text”] {
-flex: 1;
-font-family: ‘JetBrains Mono’, monospace;
-font-size: 15px; font-weight: 700;
-padding: 10px 14px;
-border: 2px solid var(–light);
-border-radius: 8px;
-background: var(–cream);
-color: var(–ink);
-outline: none;
-letter-spacing: 0.1em;
-transition: border-color 0.15s;
-}
-input[type=“text”]:focus { border-color: var(–red); }
-input[type=“text”]::placeholder { color: var(–gray); font-weight: 400; letter-spacing: 0; }
-
-/* FLASH */
-.flash {
-padding: 10px 20px;
-font-size: 13px; font-weight: 700;
-display: none; align-items: center; gap: 8px;
-animation: fadeout 2.5s forwards;
-}
-.flash.show { display: flex; }
-.flash.success { background: #E8F5E9; color: #2E7D32; }
-.flash.error { background: #FFEBEE; color: #C62828; }
-.flash.warn { background: #FFF8E1; color: #F57F17; }
-@keyframes fadeout {
-0% { opacity: 1; }
-70% { opacity: 1; }
-100% { opacity: 0; }
-}
-
-/* LIST SECTION */
-.list-card {
-background: white;
-border-radius: 16px;
-box-shadow: var(–shadow);
-overflow: hidden;
-margin-bottom: 20px;
-}
-.list-stats {
-padding: 14px 20px;
-background: var(–cream);
-border-bottom: 1px solid var(–light);
-display: flex; align-items: center; justify-content: space-between;
-font-size: 13px;
-}
-.count-badge {
-background: var(–red);
-color: white;
-font-weight: 900; font-size: 22px;
-padding: 2px 12px;
-border-radius: 6px;
-font-family: ‘JetBrains Mono’, monospace;
-}
-.list-empty {
-padding: 40px 20px;
-text-align: center;
-color: var(–gray);
-font-size: 14px;
-line-height: 1.8;
-}
-.list-empty .empty-icon { font-size: 36px; margin-bottom: 10px; }
-
-/* TABLE */
-.tracking-table { width: 100%; border-collapse: collapse; }
-.tracking-table th {
-background: var(–light);
-font-size: 10px; font-weight: 700;
-letter-spacing: 0.1em; text-transform: uppercase;
-padding: 10px 16px; text-align: left;
-color: var(–gray);
-}
-.tracking-table td {
-padding: 12px 16px;
-border-bottom: 1px solid var(–light);
-font-size: 13px; vertical-align: middle;
-}
-.tracking-table tr:last-child td { border-bottom: none; }
-.tracking-table tr:hover td { background: var(–cream); }
-.num-cell {
-font-family: ‘JetBrains Mono’, monospace;
-font-weight: 700; font-size: 14px;
-letter-spacing: 0.08em; color: var(–ink);
-}
-.num-idx {
-font-size: 11px; font-weight: 700; color: var(–gray);
-font-family: ‘JetBrains Mono’, monospace;
-}
-.url-cell a {
-color: var(–blue); font-size: 11px;
-text-decoration: none; word-break: break-all;
-font-family: ‘JetBrains Mono’, monospace;
-}
-.url-cell a:hover { color: var(–red); text-decoration: underline; }
-.del-btn {
-background: none; border: none; cursor: pointer;
-color: var(–gray); font-size: 16px; padding: 4px 8px;
-border-radius: 4px; transition: all 0.1s;
-line-height: 1;
-}
-.del-btn:hover { background: #FFEBEE; color: var(–red); }
-.type-badge {
-font-size: 10px; font-weight: 700; letter-spacing: 0.06em;
-padding: 2px 7px; border-radius: 4px;
-display: inline-block; margin-top: 3px;
-}
-.type-plus { background: #FFF3E0; color: #E65100; }
-.type-light { background: #E3F2FD; color: #0D47A1; }
-.type-unknown { background: var(–light); color: var(–gray); }
-
-/* EXPORT BAR */
-.export-bar {
-background: white;
-border-radius: 16px;
-box-shadow: var(–shadow);
-padding: 20px;
-display: flex; gap: 12px; align-items: flex-start; flex-wrap: wrap;
-flex-direction: column;
-}
-.export-bar .hint {
-font-size: 12px; color: var(–gray);
-}
-.export-filename-row {
-display: flex; gap: 8px; align-items: center; width: 100%; flex-wrap: wrap;
-}
-.export-filename-row label {
-font-size: 11px; font-weight: 700; color: var(–gray);
-letter-spacing: 0.1em; text-transform: uppercase;
-white-space: nowrap;
-}
-.export-filename-row input {
-flex: 1; min-width: 180px;
-font-family: ‘JetBrains Mono’, monospace;
-font-size: 13px; font-weight: 700;
-padding: 8px 12px;
-border: 2px solid var(–light);
-border-radius: 8px;
-background: var(–cream);
-color: var(–ink);
-outline: none;
-transition: border-color 0.15s;
-}
-.export-filename-row input:focus { border-color: var(–blue); }
-.export-filename-row .ext {
-font-size: 13px; font-weight: 700; color: var(–gray);
-font-family: ‘JetBrains Mono’, monospace;
-}
-.export-btn-row {
-display: flex; gap: 10px; align-items: center; width: 100%; flex-wrap: wrap;
-}
-.browser-note {
-font-size: 11px; color: var(–gray);
-background: var(–light); border-radius: 6px;
-padding: 4px 10px; display: inline-block;
-}
-
-/* TOAST */
-#toast {
-position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
-background: var(–ink); color: white;
-padding: 12px 24px; border-radius: 24px;
-font-size: 13px; font-weight: 700;
-box-shadow: 0 8px 32px rgba(0,0,0,0.3);
-opacity: 0; transition: opacity 0.3s; pointer-events: none;
-white-space: nowrap; z-index: 100;
-}
-#toast.show { opacity: 1; }
+  :root {
+    --red: #C8002D;
+    --red-dark: #8C001F;
+    --blue: #003087;
+    --blue-light: #1A4FBF;
+    --cream: #FAF7F2;
+    --ink: #1A1410;
+    --gray: #6B6560;
+    --light: #EDEAE4;
+    --shadow: 0 4px 24px rgba(0,0,0,0.12);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Yu Gothic UI", "Meiryo", sans-serif;
+    background: var(--cream);
+    color: var(--ink);
+    min-height: 100vh;
+    font-size: 14px;
+  }
+  header {
+    background: var(--red);
+    color: white;
+    position: relative;
+    overflow: hidden;
+  }
+  header::before {
+    content: '';
+    position: absolute;
+    top: -40px; right: -40px;
+    width: 200px; height: 200px;
+    background: var(--red-dark);
+    border-radius: 50%;
+    opacity: 0.4;
+  }
+  .header-inner {
+    padding: 24px 28px 18px;
+    position: relative; z-index: 1;
+    display: flex; align-items: center; gap: 14px;
+  }
+  .logo-mark { font-size: 32px; line-height: 1; }
+  .header-text h1 { font-size: 20px; font-weight: bold; letter-spacing: 0.04em; line-height: 1.2; }
+  .header-text p { font-size: 11px; opacity: 0.75; margin-top: 3px; letter-spacing: 0.08em; }
+  .badge-row { padding: 0 28px 18px; position: relative; z-index: 1; display: flex; gap: 8px; flex-wrap: wrap; }
+  .badge { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); color: white; font-size: 11px; font-weight: bold; padding: 3px 10px; border-radius: 20px; }
+  .badge.blue { background: var(--blue); border-color: var(--blue-light); }
+  main { max-width: 720px; margin: 0 auto; padding: 24px 16px 60px; }
+  .card { background: white; border-radius: 14px; box-shadow: var(--shadow); overflow: hidden; margin-bottom: 18px; }
+  .card-header { background: var(--ink); color: white; padding: 12px 18px; font-weight: bold; font-size: 13px; letter-spacing: 0.04em; }
+  #camera-section { padding: 18px; }
+  #video-container { position: relative; background: #111; border-radius: 10px; overflow: hidden; aspect-ratio: 16/9; display: none; margin-bottom: 12px; }
+  #video-container.active { display: block; }
+  video { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .scan-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+  .scan-frame { width: 80%; max-width: 380px; height: 80px; border: 2px solid var(--red); border-radius: 6px; position: relative; }
+  .scan-line { position: absolute; left: 4px; right: 4px; height: 2px; background: var(--red); animation: scanline 2s ease-in-out infinite; box-shadow: 0 0 8px var(--red); }
+  @keyframes scanline { 0%{top:8%} 50%{top:84%} 100%{top:8%} }
+  .corner { position: absolute; width: 13px; height: 13px; border-color: white; border-style: solid; }
+  .corner.tl { top:-2px; left:-2px; border-width: 3px 0 0 3px; }
+  .corner.tr { top:-2px; right:-2px; border-width: 3px 3px 0 0; }
+  .corner.bl { bottom:-2px; left:-2px; border-width: 0 0 3px 3px; }
+  .corner.br { bottom:-2px; right:-2px; border-width: 0 3px 3px 0; }
+  .camera-hint { text-align:center; font-size:12px; color:var(--gray); margin-bottom:12px; }
+  .btn-row { display:flex; gap:10px; justify-content:center; }
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 9px 18px; border-radius: 8px; font-family: inherit; font-weight: bold; font-size: 13px; cursor: pointer; border: none; transition: opacity 0.15s; letter-spacing: 0.03em; }
+  .btn:hover { opacity: 0.82; }
+  .btn-primary { background: var(--red); color: white; }
+  .btn-stop    { background: var(--ink); color: white; }
+  .btn-export  { background: var(--blue); color: white; padding: 11px 26px; font-size: 14px; border-radius: 10px; }
+  .btn-export:disabled { background: var(--gray); cursor: not-allowed; opacity: 1; }
+  .btn-clear   { background: transparent; color: var(--gray); border: 1.5px solid var(--light); padding: 11px 18px; font-size: 13px; border-radius: 10px; }
+  .btn-clear:hover { border-color: var(--red); color: var(--red); opacity: 1; }
+  .manual-section { padding: 16px 18px 18px; border-top: 1px solid var(--light); }
+  .manual-label { font-size: 11px; font-weight: bold; color: var(--gray); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 9px; }
+  .manual-row { display: flex; gap: 8px; }
+  input[type="text"] { flex: 1; font-family: "Courier New", Courier, monospace; font-size: 15px; font-weight: bold; padding: 9px 12px; border: 2px solid var(--light); border-radius: 8px; background: var(--cream); color: var(--ink); outline: none; letter-spacing: 0.08em; transition: border-color 0.15s; }
+  input[type="text"]:focus { border-color: var(--red); }
+  input[type="text"]::placeholder { color: #aaa; font-weight: normal; letter-spacing: 0; }
+  #flash { padding: 10px 18px; font-size: 13px; font-weight: bold; display: none; align-items: center; gap: 8px; }
+  #flash.show { display: flex; }
+  #flash.success { background: #E8F5E9; color: #2E7D32; }
+  #flash.error   { background: #FFEBEE; color: #C62828; }
+  #flash.warn    { background: #FFF8E1; color: #E65100; }
+  .list-stats { padding: 12px 18px; background: var(--cream); border-bottom: 1px solid var(--light); display: flex; align-items: center; gap: 12px; font-size: 13px; }
+  .count-badge { background: var(--red); color: white; font-weight: bold; font-size: 20px; padding: 2px 12px; border-radius: 6px; font-family: "Courier New", monospace; }
+  .list-empty { padding: 36px 18px; text-align: center; color: var(--gray); font-size: 14px; line-height: 1.9; }
+  .empty-icon { font-size: 34px; margin-bottom: 8px; }
+  .tracking-table { width: 100%; border-collapse: collapse; }
+  .tracking-table th { background: var(--light); font-size: 10px; font-weight: bold; letter-spacing: 0.1em; text-transform: uppercase; padding: 9px 14px; text-align: left; color: var(--gray); }
+  .tracking-table td { padding: 11px 14px; border-bottom: 1px solid var(--light); font-size: 13px; vertical-align: middle; }
+  .tracking-table tr:last-child td { border-bottom: none; }
+  .tracking-table tr:hover td { background: var(--cream); }
+  .num-cell { font-family: "Courier New", monospace; font-weight: bold; font-size: 14px; letter-spacing: 0.06em; }
+  .num-idx  { font-size: 11px; font-weight: bold; color: var(--gray); font-family: "Courier New", monospace; }
+  .url-cell a { color: var(--blue); font-size: 11px; text-decoration: none; word-break: break-all; font-family: "Courier New", monospace; }
+  .url-cell a:hover { color: var(--red); text-decoration: underline; }
+  .del-btn { background: none; border: none; cursor: pointer; color: var(--gray); font-size: 16px; padding: 3px 7px; border-radius: 4px; line-height: 1; }
+  .del-btn:hover { background: #FFEBEE; color: var(--red); }
+  .type-badge { font-size: 10px; font-weight: bold; padding: 2px 7px; border-radius: 4px; display: inline-block; margin-top: 3px; }
+  .type-plus    { background: #FFF3E0; color: #E65100; }
+  .type-light   { background: #E3F2FD; color: #0D47A1; }
+  .type-unknown { background: var(--light); color: var(--gray); }
+  .export-bar { background: white; border-radius: 14px; box-shadow: var(--shadow); padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+  .export-hint { font-size: 12px; color: var(--gray); }
+  .export-filename-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .export-filename-row label { font-size: 11px; font-weight: bold; color: var(--gray); letter-spacing: 0.08em; white-space: nowrap; }
+  .export-filename-row input { flex: 1; min-width: 160px; font-family: "Courier New", monospace; font-size: 13px; font-weight: bold; padding: 8px 11px; border: 2px solid var(--light); border-radius: 8px; background: var(--cream); color: var(--ink); outline: none; transition: border-color 0.15s; }
+  .export-filename-row input:focus { border-color: var(--blue); }
+  .export-filename-row .ext { font-size: 13px; font-weight: bold; color: var(--gray); font-family: "Courier New", monospace; }
+  .export-btn-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .browser-note { font-size: 11px; color: var(--gray); background: var(--light); border-radius: 6px; padding: 4px 10px; }
+  .browser-note.ok { color: #2E7D32; background: #E8F5E9; }
+  #detector-warning { background: #FFF8E1; border-left: 4px solid #F9A825; padding: 12px 18px; font-size: 12px; color: #5D4037; display: none; }
+  #detector-warning.show { display: block; }
+  #toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); background: var(--ink); color: white; padding: 11px 22px; border-radius: 22px; font-size: 13px; font-weight: bold; box-shadow: 0 6px 28px rgba(0,0,0,0.28); opacity: 0; transition: opacity 0.3s; pointer-events: none; white-space: nowrap; z-index: 100; }
+  #toast.show { opacity: 1; }
 </style>
-
 </head>
 <body>
 
@@ -388,7 +130,7 @@ white-space: nowrap; z-index: 100;
     <div class="logo-mark">📦</div>
     <div class="header-text">
       <h1>レターパック 追跡番号スキャナー</h1>
-      <p>Letterpack Tracking Number Scanner &amp; Exporter</p>
+      <p>LETTERPACK TRACKING NUMBER SCANNER &amp; EXPORTER</p>
     </div>
   </div>
   <div class="badge-row">
@@ -400,83 +142,64 @@ white-space: nowrap; z-index: 100;
 
 <main>
 
-  <!-- SCAN CARD -->
-
-  <div class="scan-card">
-    <div class="card-header">
-      <span class="icon">📷</span> バーコードスキャン / 手動入力
+  <div class="card">
+    <div class="card-header">📷 バーコードスキャン / 手動入力</div>
+    <div id="camera-section">
+      <div id="video-container">
+        <video id="video" autoplay playsinline muted></video>
+        <div class="scan-overlay">
+          <div class="scan-frame">
+            <div class="scan-line"></div>
+            <div class="corner tl"></div><div class="corner tr"></div>
+            <div class="corner bl"></div><div class="corner br"></div>
+          </div>
+        </div>
+      </div>
+      <p class="camera-hint" id="camera-hint">バーコードをスキャン枠内に合わせてください</p>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="startBtn" onclick="startCamera()">📷 カメラを起動</button>
+        <button class="btn btn-stop" id="stopBtn" onclick="stopCamera()" style="display:none">⏹ 停止</button>
+      </div>
     </div>
-
-```
-<div id="camera-section">
-  <div id="video-container">
-    <video id="video" autoplay playsinline muted></video>
-    <div class="scan-overlay">
-      <div class="scan-frame">
-        <div class="scan-line"></div>
-        <div class="corner tl"></div>
-        <div class="corner tr"></div>
-        <div class="corner bl"></div>
-        <div class="corner br"></div>
+    <div id="detector-warning">
+      ⚠ このブラウザはカメラによるバーコード読み取りに対応していません（Chrome 88以降、またはSafari 17以降を推奨）。下の手入力欄をご利用ください。
+    </div>
+    <div id="flash"></div>
+    <div class="manual-section">
+      <div class="manual-label">✏ 追跡番号を手入力</div>
+      <div class="manual-row">
+        <input type="text" id="manualInput" placeholder="例: 0123-4567-8901 または 012345678901" maxlength="20"
+          onkeydown="if(event.key==='Enter') addManual()">
+        <button class="btn btn-primary" onclick="addManual()">追加</button>
       </div>
     </div>
   </div>
-  <p class="camera-label" id="camera-hint">バーコードをスキャン枠に合わせてください</p>
-  <div class="btn-row">
-    <button class="btn btn-primary" id="startBtn" onclick="startCamera()">📷 カメラを起動</button>
-    <button class="btn btn-stop" id="stopBtn" onclick="stopCamera()" style="display:none">⏹ 停止</button>
-  </div>
-</div>
 
-<div id="flash" class="flash"></div>
-
-<div class="manual-section">
-  <div class="manual-label">✏ 追跡番号を手入力</div>
-  <div class="manual-row">
-    <input type="text" id="manualInput" placeholder="例: 0123-4567-8901" maxlength="20"
-      onkeydown="if(event.key==='Enter') addManual()">
-    <button class="btn btn-primary" onclick="addManual()">追加</button>
-  </div>
-</div>
-```
-
-  </div>
-
-  <!-- LIST CARD -->
-
-  <div class="list-card">
-    <div class="card-header">
-      <span class="icon">📋</span> 登録済み追跡番号
-    </div>
+  <div class="card">
+    <div class="card-header">📋 登録済み追跡番号</div>
     <div class="list-stats">
-      <div>
-        <span class="count-badge" id="countBadge">0</span>
-        <span style="font-size:13px; margin-left:10px; color:var(--gray);">件登録済み</span>
-      </div>
+      <span class="count-badge" id="countBadge">0</span>
+      <span style="color:var(--gray)">件登録済み</span>
     </div>
     <div id="listBody">
       <div class="list-empty">
         <div class="empty-icon">📭</div>
         <div>まだ追跡番号が登録されていません</div>
-        <div style="font-size:12px; margin-top:6px;">バーコードをスキャンするか、手入力してください</div>
+        <div style="font-size:12px; margin-top:5px;">バーコードをスキャンするか、手入力してください</div>
       </div>
     </div>
   </div>
 
-  <!-- EXPORT BAR -->
-
   <div class="export-bar">
-    <div class="hint">A・B列（部屋番号・宛先）は空欄で出力されます。Excelで直接入力してください。</div>
+    <div class="export-hint">A・B列（部屋番号・宛先）は空欄で出力されます。Excelで直接入力してください。</div>
     <div class="export-filename-row">
       <label>ファイル名</label>
-      <input type="text" id="filenameInput" placeholder="letterpack_20260405" maxlength="80">
+      <input type="text" id="filenameInput" maxlength="80">
       <span class="ext">.xlsx</span>
     </div>
     <div class="export-btn-row">
       <button class="btn btn-clear" onclick="clearAll()">🗑 全件削除</button>
-      <button class="btn btn-export" id="exportBtn" onclick="exportXlsx()" disabled>
-        📊 Excelでダウンロード
-      </button>
+      <button class="btn btn-export" id="exportBtn" onclick="exportXlsx()" disabled>📊 Excelでダウンロード</button>
       <span class="browser-note" id="browserNote"></span>
     </div>
   </div>
@@ -485,254 +208,248 @@ white-space: nowrap; z-index: 100;
 
 <div id="toast"></div>
 
-<!-- ZXing for barcode detection -->
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/zxing-js/0.19.2/umd/index.min.js"></script>
-
 <script>
-// ---- STATE ----
-let trackingList = [];
-let codeReader = null;
-let scanning = false;
+var trackingList = [];
+var videoStream = null;
+var scanInterval = null;
+var lastScanned = '';
+var lastScannedAt = 0;
 
-// ---- TRACKING URL ----
 function makeUrl(num) {
-  const clean = num.replace(/-/g, '');
-  return `https://trackings.post.japanpost.jp/services/srv/search/direct?reqCodeNo1=${clean}&searchKind=S002&locale=ja`;
+  var clean = num.replace(/-/g, '');
+  return 'https://trackings.post.japanpost.jp/services/srv/search/direct?reqCodeNo1=' + clean + '&searchKind=S002&locale=ja';
 }
-
-// ---- TYPE DETECTION ----
 function detectType(num) {
-  const clean = num.replace(/-/g, '');
-  if (clean.startsWith('31') || clean.startsWith('32')) return 'plus';
-  if (clean.startsWith('33') || clean.startsWith('34')) return 'light';
+  var d = num.replace(/-/g, '');
+  if (d.startsWith('31') || d.startsWith('32')) return 'plus';
+  if (d.startsWith('33') || d.startsWith('34')) return 'light';
   return 'unknown';
 }
-
-// ---- NORMALIZE ----
 function normalize(raw) {
-  const digits = raw.replace(/\D/g, '');
+  var digits = raw.replace(/\D/g, '');
   if (digits.length !== 12) return null;
   return digits.replace(/^(\d{4})(\d{4})(\d{4})$/, '$1-$2-$3');
 }
 
-// ---- ADD ----
-function addTracking(raw, fromCamera = false) {
-  const num = normalize(raw);
-  if (!num) {
-    showFlash(`⚠ 12桁の追跡番号ではありません: "${raw}"`, 'warn');
-    return false;
-  }
-  if (trackingList.find(t => t.num === num)) {
-    showFlash(`⚠ すでに登録済みです: ${num}`, 'warn');
-    return false;
-  }
-  trackingList.push({ num, url: makeUrl(num), type: detectType(num) });
+function addTracking(raw, fromCamera) {
+  var num = normalize(raw);
+  if (!num) { showFlash('12桁の追跡番号ではありません: "' + raw + '"', 'warn'); return false; }
+  if (trackingList.find(function(t){ return t.num === num; })) { showFlash('すでに登録済みです: ' + num, 'warn'); return false; }
+  trackingList.push({ num: num, url: makeUrl(num), type: detectType(num) });
   renderList();
-  showFlash(`✓ 追加しました: ${num}`, 'success');
-  if (fromCamera) showToast(`📦 ${num}`);
+  showFlash('追加しました: ' + num, 'success');
+  if (fromCamera) showToast('📦 ' + num);
   return true;
 }
-
 function addManual() {
-  const val = document.getElementById('manualInput').value.trim();
+  var val = document.getElementById('manualInput').value.trim();
   if (!val) return;
-  addTracking(val);
+  addTracking(val, false);
   document.getElementById('manualInput').value = '';
 }
-
-// ---- DELETE ----
-function deleteItem(idx) {
-  trackingList.splice(idx, 1);
-  renderList();
-}
-
+function deleteItem(idx) { trackingList.splice(idx, 1); renderList(); }
 function clearAll() {
   if (trackingList.length === 0) return;
-  if (!confirm(`${trackingList.length}件すべて削除しますか？`)) return;
-  trackingList = [];
-  renderList();
+  if (!confirm(trackingList.length + '件すべて削除しますか？')) return;
+  trackingList = []; renderList();
 }
 
-// ---- RENDER ----
 function renderList() {
-  const el = document.getElementById('listBody');
-  const count = trackingList.length;
+  var el = document.getElementById('listBody');
+  var count = trackingList.length;
   document.getElementById('countBadge').textContent = count;
   document.getElementById('exportBtn').disabled = count === 0;
-
   if (count === 0) {
-    el.innerHTML = `<div class="list-empty">
-      <div class="empty-icon">📭</div>
-      <div>まだ追跡番号が登録されていません</div>
-      <div style="font-size:12px; margin-top:6px;">バーコードをスキャンするか、手入力してください</div>
-    </div>`;
+    el.innerHTML = '<div class="list-empty"><div class="empty-icon">📭</div><div>まだ追跡番号が登録されていません</div><div style="font-size:12px;margin-top:5px;">バーコードをスキャンするか、手入力してください</div></div>';
     return;
   }
-
-  const typeLabel = { plus: 'プラス', light: 'ライト', unknown: '不明' };
-  const typeClass = { plus: 'type-plus', light: 'type-light', unknown: 'type-unknown' };
-
-  const rows = trackingList.map((t, i) => `
-    <tr>
-      <td><span class="num-idx">${String(i+1).padStart(2,'0')}</span></td>
-      <td>
-        <div class="num-cell">${t.num}</div>
-        <span class="type-badge ${typeClass[t.type]}">${typeLabel[t.type]}</span>
-      </td>
-      <td class="url-cell"><a href="${t.url}" target="_blank" rel="noopener">${t.url}</a></td>
-      <td><button class="del-btn" onclick="deleteItem(${i})" title="削除">✕</button></td>
-    </tr>
-  `).join('');
-
-  el.innerHTML = `<table class="tracking-table">
-    <thead><tr>
-      <th>#</th>
-      <th>追跡番号</th>
-      <th>追跡URL</th>
-      <th></th>
-    </tr></thead>
-    <tbody>${rows}</tbody>
-  </table>`;
+  var typeLabel = { plus: 'プラス', light: 'ライト', unknown: '不明' };
+  var typeClass  = { plus: 'type-plus', light: 'type-light', unknown: 'type-unknown' };
+  var rows = trackingList.map(function(t, i) {
+    return '<tr>' +
+      '<td><span class="num-idx">' + String(i+1).padStart(2,'0') + '</span></td>' +
+      '<td><div class="num-cell">' + t.num + '</div><span class="type-badge ' + typeClass[t.type] + '">' + typeLabel[t.type] + '</span></td>' +
+      '<td class="url-cell"><a href="' + t.url + '" target="_blank" rel="noopener">' + t.url + '</a></td>' +
+      '<td><button class="del-btn" onclick="deleteItem(' + i + ')" title="削除">&#x2715;</button></td>' +
+      '</tr>';
+  }).join('');
+  el.innerHTML = '<table class="tracking-table"><thead><tr><th>#</th><th>追跡番号</th><th>追跡URL</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>';
 }
 
-// ---- FLASH ----
+var flashTimer;
 function showFlash(msg, type) {
-  const el = document.getElementById('flash');
-  el.className = `flash show ${type}`;
-  el.textContent = msg;
-  el.style.animation = 'none';
-  requestAnimationFrame(() => {
-    el.style.animation = 'fadeout 2.5s forwards';
-  });
-  setTimeout(() => { el.className = 'flash'; }, 2600);
+  var el = document.getElementById('flash');
+  el.className = 'show ' + type;
+  el.textContent = (type === 'success' ? '✓ ' : type === 'warn' ? '⚠ ' : '❌ ') + msg;
+  clearTimeout(flashTimer);
+  flashTimer = setTimeout(function(){ el.className = ''; }, 3000);
 }
-
-// ---- TOAST ----
-let toastTimer;
+var toastTimer;
 function showToast(msg) {
-  const el = document.getElementById('toast');
+  var el = document.getElementById('toast');
   el.textContent = msg;
   el.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove('show'), 2000);
+  toastTimer = setTimeout(function(){ el.classList.remove('show'); }, 2200);
 }
 
-// ---- CAMERA ----
-async function startCamera() {
-  try {
-    if (typeof ZXing === 'undefined') {
-      showFlash('❌ バーコードライブラリの読み込みに失敗しました', 'error');
-      return;
-    }
-    const hints = new Map();
-    const formats = [ZXing.BarcodeFormat.CODE_128, ZXing.BarcodeFormat.EAN_13, ZXing.BarcodeFormat.CODE_39];
-    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
-    codeReader = new ZXing.BrowserMultiFormatReader(hints);
+/* --- CAMERA (BarcodeDetector API) --- */
+var hasBarcodeDetector = (typeof BarcodeDetector !== 'undefined');
 
-    const vc = document.getElementById('video-container');
-    vc.classList.add('active');
+function checkBarcodeSupport() {
+  if (!hasBarcodeDetector) {
+    document.getElementById('detector-warning').classList.add('show');
+    var btn = document.getElementById('startBtn');
+    btn.disabled = true;
+    btn.style.opacity = '0.4';
+    btn.style.cursor = 'not-allowed';
+  }
+}
+
+async function startCamera() {
+  if (!hasBarcodeDetector) return;
+  try {
+    videoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    var video = document.getElementById('video');
+    video.srcObject = videoStream;
+    await video.play();
+    document.getElementById('video-container').classList.add('active');
     document.getElementById('startBtn').style.display = 'none';
     document.getElementById('stopBtn').style.display = 'inline-flex';
-    document.getElementById('camera-hint').textContent = 'バーコードをスキャン枠に合わせてください';
-    scanning = true;
-
-    await codeReader.decodeFromVideoDevice(null, 'video', (result, err) => {
-      if (result && scanning) {
-        const text = result.getText();
-        const added = addTracking(text, true);
-        if (added) {
-          // brief pause to avoid duplicates
-          scanning = false;
-          setTimeout(() => { scanning = true; }, 2000);
+    var detector = new BarcodeDetector({ formats: ['code_128','ean_13','ean_8','code_39'] });
+    scanInterval = setInterval(async function() {
+      if (!videoStream) return;
+      try {
+        var barcodes = await detector.detect(video);
+        if (barcodes.length > 0) {
+          var text = barcodes[0].rawValue;
+          var now = Date.now();
+          if (text === lastScanned && now - lastScannedAt < 2000) return;
+          lastScanned = text; lastScannedAt = now;
+          addTracking(text, true);
         }
-      }
-    });
+      } catch(e) {}
+    }, 300);
   } catch(e) {
-    showFlash('❌ カメラを起動できませんでした: ' + e.message, 'error');
+    showFlash('カメラを起動できませんでした: ' + e.message, 'error');
     stopCamera();
   }
 }
 
 function stopCamera() {
-  scanning = false;
-  if (codeReader) {
-    codeReader.reset();
-    codeReader = null;
-  }
+  clearInterval(scanInterval); scanInterval = null;
+  if (videoStream) { videoStream.getTracks().forEach(function(t){ t.stop(); }); videoStream = null; }
+  var video = document.getElementById('video'); video.srcObject = null;
   document.getElementById('video-container').classList.remove('active');
   document.getElementById('startBtn').style.display = 'inline-flex';
   document.getElementById('stopBtn').style.display = 'none';
-  document.getElementById('camera-hint').textContent = 'バーコードをスキャン枠に合わせてください';
 }
 
-// ---- FILENAME DEFAULT ----
-function defaultFilename() {
-  const d = new Date();
-  const stamp = `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
-  return `letterpack_${stamp}`;
+/* --- XLSX builder (CDN不要・純粋JS) --- */
+function escXml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function buildXlsxBlob() {
+  var rows = [['部屋番号','宛先','追跡番号','追跡URL']];
+  trackingList.forEach(function(t){ rows.push(['','',t.num,t.url]); });
+  var sheetRows = rows.map(function(row,ri){
+    var cells = row.map(function(val,ci){
+      var ref = String.fromCharCode(65+ci)+(ri+1);
+      return '<c r="'+ref+'" t="inlineStr"><is><t>'+escXml(val)+'</t></is></c>';
+    }).join('');
+    return '<row r="'+(ri+1)+'">'+cells+'</row>';
+  }).join('');
+  var colDefs = '<col min="1" max="1" width="12" customWidth="1"/><col min="2" max="2" width="20" customWidth="1"/><col min="3" max="3" width="18" customWidth="1"/><col min="4" max="4" width="90" customWidth="1"/>';
+  var files = {
+    '[Content_Types].xml': '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>',
+    '_rels/.rels': '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>',
+    'xl/workbook.xml': '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="追跡番号一覧" sheetId="1" r:id="rId1"/></sheets></workbook>',
+    'xl/_rels/workbook.xml.rels': '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>',
+    'xl/worksheets/sheet1.xml': '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cols>'+colDefs+'</cols><sheetData>'+sheetRows+'</sheetData></worksheet>'
+  };
+  return buildZip(files);
 }
 
-// ---- BROWSER CHECK ----
-const supportsFilePicker = typeof window.showSaveFilePicker === 'function';
-window.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('filenameInput').value = defaultFilename();
-  const note = document.getElementById('browserNote');
-  if (supportsFilePicker) {
-    note.textContent = '📂 保存場所も選択できます（Chrome/Edge）';
-    note.style.color = '#2E7D32';
-    note.style.background = '#E8F5E9';
-  } else {
-    note.textContent = '💡 Chrome/Edgeでは保存場所も選択可能です';
+function strToU8(str) {
+  var bytes = [];
+  for (var i=0;i<str.length;i++){
+    var c=str.charCodeAt(i);
+    if(c<128){bytes.push(c);}
+    else if(c<2048){bytes.push((c>>6)|192,(c&63)|128);}
+    else{bytes.push((c>>12)|224,((c>>6)&63)|128,(c&63)|128);}
   }
+  return new Uint8Array(bytes);
+}
+function crc32(data){
+  if(!crc32.t){crc32.t=new Uint32Array(256);for(var i=0;i<256;i++){var c=i;for(var j=0;j<8;j++)c=(c&1)?(0xEDB88320^(c>>>1)):(c>>>1);crc32.t[i]=c;}}
+  var crc=0xFFFFFFFF;
+  for(var k=0;k<data.length;k++)crc=(crc>>>8)^crc32.t[(crc^data[k])&0xFF];
+  return(crc^0xFFFFFFFF)>>>0;
+}
+function w16(b,o,v){b[o]=v&255;b[o+1]=(v>>8)&255;}
+function w32(b,o,v){b[o]=v&255;b[o+1]=(v>>8)&255;b[o+2]=(v>>16)&255;b[o+3]=(v>>24)&255;}
+function buildZip(files){
+  var parts=[],cds=[],offset=0;
+  Object.keys(files).forEach(function(name){
+    var nb=strToU8(name),db=strToU8(files[name]),crc=crc32(db),sz=db.length;
+    var lh=new Uint8Array(30+nb.length);
+    w32(lh,0,0x04034B50);w16(lh,4,20);w16(lh,6,0);w16(lh,8,0);
+    w16(lh,10,0);w16(lh,12,0);w32(lh,14,crc);w32(lh,18,sz);w32(lh,22,sz);
+    w16(lh,26,nb.length);w16(lh,28,0);lh.set(nb,30);
+    parts.push(lh);parts.push(db);
+    var ch=new Uint8Array(46+nb.length);
+    w32(ch,0,0x02014B50);w16(ch,4,20);w16(ch,6,20);w16(ch,8,0);w16(ch,10,0);
+    w16(ch,12,0);w16(ch,14,0);w32(ch,16,crc);w32(ch,20,sz);w32(ch,24,sz);
+    w16(ch,28,nb.length);w16(ch,30,0);w16(ch,32,0);w16(ch,34,0);w16(ch,36,0);
+    w32(ch,38,0);w32(ch,42,offset);ch.set(nb,46);
+    cds.push(ch);offset+=lh.length+db.length;
+  });
+  var csz=cds.reduce(function(s,h){return s+h.length;},0);
+  var eocd=new Uint8Array(22);
+  var n=Object.keys(files).length;
+  w32(eocd,0,0x06054B50);w16(eocd,4,0);w16(eocd,6,0);
+  w16(eocd,8,n);w16(eocd,10,n);w32(eocd,12,csz);w32(eocd,16,offset);w16(eocd,20,0);
+  var all=parts.concat(cds).concat([eocd]);
+  var total=all.reduce(function(s,p){return s+p.length;},0);
+  var out=new Uint8Array(total),pos=0;
+  all.forEach(function(p){out.set(p,pos);pos+=p.length;});
+  return new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+}
+
+/* --- EXPORT --- */
+var supportsFilePicker = (typeof window.showSaveFilePicker === 'function');
+function defaultFilename(){
+  var d=new Date();
+  return 'letterpack_'+d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0');
+}
+async function exportXlsx(){
+  if(trackingList.length===0)return;
+  var ni=document.getElementById('filenameInput').value.trim();
+  var filename=(ni||defaultFilename())+'.xlsx';
+  var blob=buildXlsxBlob();
+  if(supportsFilePicker){
+    try{
+      var handle=await window.showSaveFilePicker({suggestedName:filename,types:[{description:'Excel ファイル',accept:{'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':['.xlsx']}}]});
+      var w=await handle.createWritable();await w.write(blob);await w.close();
+      showToast('📊 "'+handle.name+'" を保存しました');return;
+    }catch(e){if(e.name==='AbortError')return;}
+  }
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');a.href=url;a.download=filename;
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  setTimeout(function(){URL.revokeObjectURL(url);},1000);
+  showToast('📊 "'+filename+'" をダウンロードしました');
+}
+
+/* --- INIT --- */
+window.addEventListener('DOMContentLoaded',function(){
+  document.getElementById('filenameInput').value=defaultFilename();
+  var note=document.getElementById('browserNote');
+  if(supportsFilePicker){note.textContent='📂 保存場所も選択できます（Chrome/Edge）';note.classList.add('ok');}
+  else{note.textContent='💡 Chrome/Edgeでは保存場所も選択可能です';}
+  checkBarcodeSupport();
 });
-
-// ---- BUILD WORKBOOK ----
-function buildWorkbook() {
-  const wb = XLSX.utils.book_new();
-  const data = [['部屋番号', '宛先', '追跡番号', '追跡URL']];
-  trackingList.forEach(t => data.push(['', '', t.num, t.url]));
-  const ws = XLSX.utils.aoa_to_sheet(data);
-  ws['!cols'] = [{ wch: 12 }, { wch: 20 }, { wch: 18 }, { wch: 90 }];
-  XLSX.utils.book_append_sheet(wb, ws, '追跡番号一覧');
-  return wb;
-}
-
-// ---- EXPORT ----
-async function exportXlsx() {
-  if (trackingList.length === 0) return;
-
-  const nameInput = document.getElementById('filenameInput').value.trim();
-  const filename = (nameInput || defaultFilename()) + '.xlsx';
-  const wb = buildWorkbook();
-
-  if (supportsFilePicker) {
-    try {
-      const handle = await window.showSaveFilePicker({
-        suggestedName: filename,
-        types: [{
-          description: 'Excel ファイル',
-          accept: { 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'] }
-        }]
-      });
-      const wbArrayBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-      const writable = await handle.createWritable();
-      await writable.write(new Blob([wbArrayBuffer], { type: 'application/octet-stream' }));
-      await writable.close();
-      showToast(`📊 "${handle.name}" を保存しました`);
-      return;
-    } catch(e) {
-      if (e.name === 'AbortError') return; // ユーザーがキャンセル
-      // fallback to normal download
-    }
-  }
-
-  // Fallback: 通常ダウンロード
-  XLSX.writeFile(wb, filename);
-  showToast(`📊 "${filename}" をダウンロードしました`);
-}
 </script>
-
 
 </body>
 </html>
