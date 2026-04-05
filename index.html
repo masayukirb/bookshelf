@@ -1176,56 +1176,73 @@
     });
   }
 
-  // --- Google Books API ---
+  // --- 国立国会図書館API ---
+
+  // NDL APIのXMLをパースして書誌情報を抽出
+  function parseNdlXml(xmlText) {
+    const parser = new DOMParser();
+    const xml = parser.parseFromString(xmlText, 'application/xml');
+    const items = xml.querySelectorAll('item');
+    if (!items.length) return null;
+    const item = items[0];
+
+    const getText = selector => {
+      const el = item.querySelector(selector);
+      return el ? el.textContent.trim() : null;
+    };
+
+    // dc:title, dc:creator, dc:publisher, dc:identifier(ISBN), dcndl:seriesTitle
+    const title = getText('title') || getText('dcndl\\:seriesTitle');
+    const creator = getText('creator') || getText('dc\\:creator');
+    const publisher = getText('publisher') || getText('dc\\:publisher');
+
+    // 書影はNDLのサムネイルURLを構築（ISBN13から）
+    const identifiers = item.querySelectorAll('identifier');
+    let isbn13 = null;
+    identifiers.forEach(el => {
+      const val = el.textContent.trim().replace(/[-\s]/g, '');
+      if (val.length === 13 && val.startsWith('978')) isbn13 = val;
+    });
+    const coverUrl = isbn13
+      ? `https://ndlsearch.ndl.go.jp/thumbnail/${isbn13}.jpg`
+      : null;
+
+    return {
+      name: title,
+      authors: creator,
+      publisher,
+      coverUrl,
+    };
+  }
+
+  // タイトルで書誌情報を検索（NDL）
   async function fetchBookInfo(title) {
     try {
       const q = encodeURIComponent(title.slice(0, 60));
-      const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${q}&maxResults=1&langRestrict=ja`);
+      const res = await fetch(`https://iss.ndl.go.jp/api/opensearch?title=${q}&cnt=1&mediatype=1`);
       if (!res.ok) return null;
-      const data = await res.json();
-      if (!data.items || !data.items.length) {
-        // 日本語制限で見つからない場合は制限なしで再試行
-        const res2 = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${q}&maxResults=1`);
-        const data2 = await res2.json();
-        if (!data2.items || !data2.items.length) return null;
-        return extractBookInfo(data2.items[0]);
-      }
-      return extractBookInfo(data.items[0]);
+      const text = await res.text();
+      const info = parseNdlXml(text);
+      if (!info) return null;
+      return {
+        authors: info.authors,
+        publisher: info.publisher,
+        coverUrl: info.coverUrl,
+      };
     } catch(e) {
       return null;
     }
   }
 
-  function extractBookInfo(item) {
-    const info = item.volumeInfo || {};
-    return {
-      authors: (info.authors || []).join(', ') || null,
-      publisher: info.publisher || null,
-      coverUrl: info.imageLinks
-        ? (info.imageLinks.thumbnail || info.imageLinks.smallThumbnail || null)
-        : null,
-      googleBooksId: item.id || null,
-    };
-  }
-
-  // ISBNで書誌情報を取得
+  // ISBNで書誌情報を検索（NDL）
   async function fetchBookInfoByISBN(isbn) {
     try {
       const clean = isbn.replace(/[-\s]/g, '');
-      const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${clean}&maxResults=1`);
+      const res = await fetch(`https://iss.ndl.go.jp/api/opensearch?isbn=${clean}&cnt=1`);
       if (!res.ok) return null;
-      const data = await res.json();
-      if (!data.items || !data.items.length) return null;
-      const item = data.items[0];
-      const info = item.volumeInfo || {};
-      return {
-        name: info.title || null,
-        authors: (info.authors || []).join(', ') || null,
-        publisher: info.publisher || null,
-        coverUrl: info.imageLinks
-          ? (info.imageLinks.thumbnail || info.imageLinks.smallThumbnail || null)
-          : null,
-      };
+      const text = await res.text();
+      const info = parseNdlXml(text);
+      return info;
     } catch(e) {
       return null;
     }
